@@ -615,19 +615,34 @@ async function signOut(){
 
 function updateAuthUI(){
   const card = $("auth-card");
+  const GOOGLE_SVG = "<svg class='google-icon' viewBox='0 0 24 24'><path fill='#4285F4' d='M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z'/><path fill='#34A853' d='M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z'/><path fill='#FBBC05' d='M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z'/><path fill='#EA4335' d='M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z'/></svg>";
+
   if(!currentUser || currentUser.is_anonymous){
-    // Afficher bouton Google
-    card.innerHTML = "<div class='auth-title'>"+t().authTitle+"</div><div class='auth-sub'>"+t().authSub+"</div><button class='google-btn' onclick='signInWithGoogle()'><svg class='google-icon' viewBox='0 0 24 24'><path fill='#4285F4' d='M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z'/><path fill='#34A853' d='M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z'/><path fill='#FBBC05' d='M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z'/><path fill='#EA4335' d='M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z'/></svg><span>"+t().googleBtn+"</span></button>";
+    card.innerHTML = `
+      <div class='auth-title'>${t().authTitle}</div>
+      <div class='auth-sub'>${t().authSub}</div>
+      <button class='google-btn' id='google-signin-btn'>${GOOGLE_SVG}<span>${t().googleBtn}</span></button>`;
+    // Event listener propre (pas onclick inline)
+    const btn = $("google-signin-btn");
+    if(btn) btn.addEventListener("click", signInWithGoogle);
   } else {
-    // Connecté avec Google
     const name = currentUser.user_metadata?.full_name || currentUser.email || "CatSpotter";
     const avatar = currentUser.user_metadata?.avatar_url || "";
-    const avatarHtml = avatar?"<img src='"+avatar+"' alt=''>":"🐱";
-    card.innerHTML = "<div class='auth-logged'><div class='auth-logged-avatar'>"+avatarHtml+"</div><div><div class='auth-logged-name'>"+name+"</div><div class='auth-logged-email'>"+(currentUser.email||"")+"</div></div><button class='logout-btn' onclick='signOut()'>"+t().logout+"</button></div>";
+    const avatarHtml = avatar ? `<img src='${avatar}' alt=''>` : "🐱";
+    card.innerHTML = `
+      <div class='auth-logged'>
+        <div class='auth-logged-avatar'>${avatarHtml}</div>
+        <div>
+          <div class='auth-logged-name'>${name}</div>
+          <div class='auth-logged-email'>${currentUser.email||""}</div>
+        </div>
+        <button class='logout-btn' id='logout-btn'>${t().logout}</button>
+      </div>`;
+    // Event listener propre sur le bouton déconnexion
+    const logoutBtn = $("logout-btn");
+    if(logoutBtn) logoutBtn.addEventListener("click", signOut);
     // Mettre à jour avatar profil
-    if(avatar){
-      $("profile-avatar").innerHTML = "<img src='"+avatar+"' alt=''>";
-    }
+    if(avatar) $("profile-avatar").innerHTML = `<img src='${avatar}' alt=''>`;
     $("profile-name").textContent = name;
   }
   renderProfile();
@@ -670,15 +685,20 @@ async function toggleLikeDB(catId){
 }
 
 async function uploadPhoto(file, catId){
-  if(!file) return null;
+  if(!file) { console.log("uploadPhoto: pas de fichier"); return null; }
+  console.log("uploadPhoto: début", file.name, file.size, "catId:", catId);
   try {
     const compressed = await compressImage(file);
+    console.log("uploadPhoto: compressé", compressed.size, "bytes");
     const path = catId+"/"+Date.now()+".jpg";
-    const {error} = await sb.storage.from("cat-photos").upload(path, compressed, {contentType:"image/jpeg"});
-    if(error) throw error;
-    const {data} = sb.storage.from("cat-photos").getPublicUrl(path);
-    return data.publicUrl;
-  } catch(e){return null;}
+    console.log("uploadPhoto: upload vers", path);
+    const {data, error} = await sb.storage.from("cat-photos").upload(path, compressed, {contentType:"image/jpeg"});
+    if(error){ console.error("uploadPhoto: erreur upload", error); throw error; }
+    console.log("uploadPhoto: succès", data);
+    const {data:urlData} = sb.storage.from("cat-photos").getPublicUrl(path);
+    console.log("uploadPhoto: URL publique", urlData.publicUrl);
+    return urlData.publicUrl;
+  } catch(e){ console.error("uploadPhoto: exception", e); return null; }
 }
 
 // Compression canvas — max 1200px, qualité 0.82
@@ -717,16 +737,16 @@ function initMap(){
 
   mapInstance.addControl(new maplibregl.NavigationControl({showCompass:false}), "top-right");
 
-  // Timeout sécurité 8s
+  // Timeout sécurité 8s — masquer le loading même si la carte tarde
   const loadTimeout = setTimeout(()=>hideLoading(), 8000);
 
-  mapInstance.on("load", async ()=>{
+  mapInstance.on("load", ()=>{
     clearTimeout(loadTimeout);
     mapInstance.resize();
-    await loadCats();
+    hideLoading();
+    // Afficher les chats déjà chargés (loadCats est appelé en parallèle dans l'init)
     renderMapCats();
     updateCatOfDay();
-    hideLoading();
   });
 
   mapInstance.on("click", ()=>{ if(selectedCat) closePopup(); });
@@ -983,20 +1003,30 @@ async function publishSpot(){
   const newLat=userLat+(Math.random()-0.5)*0.002;
   const newLng=userLng+(Math.random()-0.5)*0.002;
 
+  // 1. Sauvegarder le chat en base d'abord
   const saved=await saveCat({
     name, emoji:"🐱", color, lat:newLat, lng:newLng,
     char:selectedChar||"friendly", sightings:1, likes_count:0, legend:false, desc
   });
 
-  const cat=saved?{...saved,likes:0}:{
+  const cat=saved ? {...saved, likes:0} : {
     id:"local-"+Date.now(), name, emoji:"🐱", color,
     lat:newLat, lng:newLng, sightings:1, likes_count:0, likes:0,
     created_at:new Date().toISOString(), desc, char:selectedChar||"friendly", legend:false
   };
 
-  if(file&&saved?.id){
-    const url=await uploadPhoto(file,saved.id);
-    if(url) cat.photo_url=url;
+  // 2. Upload photo si disponible (avec ou sans compte)
+  if(file){
+    const catId = saved?.id || cat.id;
+    console.log("Publication: upload photo pour cat", catId);
+    const url = await uploadPhoto(file, catId);
+    if(url){
+      cat.photo_url = url;
+      // Mettre à jour la photo_url en base si le cat a été sauvegardé
+      if(saved?.id){
+        await sb.from("cats").update({photo_url: url}).eq("id", saved.id);
+      }
+    }
   }
 
   cats.unshift(cat);
@@ -1143,7 +1173,7 @@ const setProgress = (pct, msg) => {
   if(sub) sub.textContent = msg;
 };
 
-// Géoloc en parallèle du reste
+// Géoloc immédiate
 if(navigator.geolocation){
   navigator.geolocation.getCurrentPosition(p=>{
     userLat=p.coords.latitude; userLng=p.coords.longitude;
@@ -1153,10 +1183,17 @@ if(navigator.geolocation){
 
 (async()=>{
   setProgress(20, lang==="fr"?"Connexion...":"Connecting...");
-  await initAuth();
-  setProgress(50, lang==="fr"?"Chargement de la carte...":"Loading map...");
-  initMap();
-  setProgress(80, lang==="fr"?"Presque prêt...":"Almost ready...");
+
+  // Charger auth ET cats en parallèle pour aller plus vite
+  await Promise.all([
+    initAuth(),
+    loadCats(),
+  ]);
+
+  setProgress(60, lang==="fr"?"Chargement de la carte...":"Loading map...");
+  initMap(); // La carte affichera les chats déjà en mémoire au "load"
+
+  setProgress(90, lang==="fr"?"Presque prêt...":"Almost ready...");
   renderChallenges();
   renderProfile();
 })();
