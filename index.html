@@ -305,10 +305,6 @@ input:focus,textarea:focus{outline:none}
           <div class="section-title" id="ch-section-title">Défis</div>
           <div class="ch-list" id="ch-list"></div>
         </div>
-        <div>
-          <div class="section-title" id="badges-title">Badges</div>
-          <div class="badges-grid" id="badges-grid"></div>
-        </div>
       </div>
     </div>
 
@@ -566,14 +562,19 @@ async function initAuth(){
     const wasLoggedIn = !!currentUser && !currentUser.is_anonymous;
     currentUser = session?.user || null;
 
-    if(event === "SIGNED_IN" && !wasLoggedIn && currentUser && !currentUser.is_anonymous){
+    if(event === "SIGNED_IN" && currentUser && !currentUser.is_anonymous){
       likes = {};
       await loadUserLikes();
-      updateAuthUI();
-      showToast("✅ "+( lang==="fr"?"Connecté avec Google !":"Signed in with Google!"));
-      // Recharger les chats pour avoir les likes à jour
+      // Recharger les chats (carte + feed)
       await loadCats();
-      if(mapInstance && mapInstance.isStyleLoaded()) renderMapCats();
+      if(mapInstance && mapInstance.isStyleLoaded()){
+        renderMapCats();
+        updateCatOfDay();
+      }
+      updateAuthUI();
+      if(currentTab==="feed") renderFeed();
+      if(currentTab==="challenges") renderChallenges();
+      showToast("✅ "+(lang==="fr"?"Connecté avec Google !":"Signed in with Google!"));
     }
 
     if(event === "SIGNED_OUT"){
@@ -603,12 +604,13 @@ async function signOut(){
   await sb.auth.signOut();
   currentUser = null;
   likes = {};
+  challenges = CHALLENGES_DEF.map(c=>({...c, done:false}));
   userProfile = {totalCats:0, streak:0, totalLikes:0};
-  // Reset UI profil
   $("profile-avatar").innerHTML = "🐱";
   $("profile-name").textContent = "CatSpotter";
   updateAuthUI();
-  showToast("👋 Déconnecté");
+  if(currentTab==="challenges") renderChallenges();
+  showToast("👋 "+(lang==="fr"?"Déconnecté":"Signed out"));
 }
 
 function updateAuthUI(){
@@ -816,21 +818,64 @@ function closePopup(){
 }
 
 // ── FEED ──────────────────────────────────────────────────────
-function renderFeed(){
+let feedPage = 0;
+const FEED_PAGE_SIZE = 20;
+
+function renderFeed(append=false){
   const wrap=$("feed-list");
+  if(!append) feedPage=0;
+
   if(cats.length===0){
     wrap.innerHTML="<div class='feed-empty'><div class='feed-empty-icon'>🐱</div><div class='feed-empty-title'>"+t().feedEmpty+"</div><div class='feed-empty-sub'>"+t().feedEmptySub+"</div></div>";
     return;
   }
+
   const colors=["#D4572A","#C9853A","#7B9EA6","#B85C38","#8B6CA6","#C0392B"];
-  wrap.innerHTML=cats.map(cat=>{
+  const slice=cats.slice(feedPage*FEED_PAGE_SIZE, (feedPage+1)*FEED_PAGE_SIZE);
+  const hasMore=cats.length > (feedPage+1)*FEED_PAGE_SIZE;
+
+  const cards=slice.map(cat=>{
     const color=cat.color||colors[Math.abs(cat.name?.charCodeAt(0)||0)%colors.length];
     const isLiked=likes[cat.id];
+    // Photo : vraie image si disponible, sinon gradient avec emoji
     const photoHtml=cat.photo_url
-      ?"<img src='"+cat.photo_url+"' alt='"+cat.name+"' style='width:100%;height:100%;object-fit:cover'>"
-      :"<span class='feed-photo-emoji'>"+(cat.emoji||"🐱")+"</span>";
-    return "<div class='feed-card'><div class='feed-head'><div class='feed-avatar' style='background:"+color+"22;border-color:"+color+"'>"+(cat.emoji||"🐱")+"</div><div><div class='feed-catname serif'>"+(cat.name||"Chat inconnu")+"</div><div class='feed-meta'>"+fmtAgo(cat.created_at||new Date().toISOString())+" · "+t().sightings(cat.sightings||1)+"</div></div><span class='feed-pin'>📍</span></div><div class='feed-photo' style='background:linear-gradient(135deg,"+color+"18,"+color+"42)'>"+photoHtml+"<div class='feed-photo-loc'>📍 Catspot</div></div>"+(cat.desc?"<p class='feed-desc'>\""+cat.desc+"\"</p>":"")+"<div class='feed-actions'><button class='feed-like-btn' id='fl-"+cat.id+"' onclick='toggleFeedLike(\""+cat.id+"\")' style='color:"+(isLiked?"#D4572A":"#8A7F72")+";'>"+(isLiked?"❤️":"🤍")+" "+((cat.likes_count||0)+(isLiked?1:0))+" "+t().likes+"</button><span class='feed-sightings'>🐾 "+t().sightings(cat.sightings||1)+"</span></div></div>";
+      ?`<img src="${cat.photo_url}" alt="${cat.name||''}" style="width:100%;height:100%;object-fit:cover;display:block" onerror="this.style.display='none';this.nextSibling.style.display='flex'">`+
+        `<span class='feed-photo-emoji' style="display:none">${cat.emoji||"🐱"}</span>`
+      :`<span class='feed-photo-emoji'>${cat.emoji||"🐱"}</span>`;
+    return `<div class='feed-card'>
+      <div class='feed-head'>
+        <div class='feed-avatar' style='background:${color}22;border-color:${color}'>${cat.emoji||"🐱"}</div>
+        <div>
+          <div class='feed-catname serif'>${cat.name||"Chat inconnu"}</div>
+          <div class='feed-meta'>${fmtAgo(cat.created_at||new Date().toISOString())} · ${t().sightings(cat.sightings||1)}</div>
+        </div>
+        <span class='feed-pin'>📍</span>
+      </div>
+      <div class='feed-photo' style='background:linear-gradient(135deg,${color}18,${color}42)'>${photoHtml}<div class='feed-photo-loc'>📍 Catspot</div></div>
+      ${cat.desc?`<p class='feed-desc'>"${cat.desc}"</p>`:""}
+      <div class='feed-actions'>
+        <button class='feed-like-btn' id='fl-${cat.id}' onclick='toggleFeedLike("${cat.id}")' style='color:${isLiked?"#D4572A":"#8A7F72"}'>
+          ${isLiked?"❤️":"🤍"} ${(cat.likes_count||0)+(isLiked?1:0)} ${t().likes}
+        </button>
+        <span class='feed-sightings'>🐾 ${t().sightings(cat.sightings||1)}</span>
+      </div>
+    </div>`;
   }).join("");
+
+  if(append){
+    // Retirer le bouton "Voir plus" existant avant d'ajouter
+    const old=$("feed-more");
+    if(old) old.remove();
+    wrap.insertAdjacentHTML("beforeend", cards);
+  } else {
+    wrap.innerHTML=cards;
+  }
+
+  // Bouton "Voir plus" si nécessaire
+  if(hasMore){
+    const moreBtn=`<div id='feed-more' style='text-align:center;padding:16px'><button onclick='feedPage++;renderFeed(true)' style='background:var(--warm);border:none;border-radius:20px;padding:10px 24px;font-size:13px;font-weight:700;color:var(--mid);cursor:pointer'>${lang==="fr"?"Voir plus":"Load more"} 🐾</button></div>`;
+    wrap.insertAdjacentHTML("beforeend", moreBtn);
+  }
 }
 
 function toggleFeedLike(id){
@@ -848,11 +893,10 @@ function renderChallenges(){
   $("pts-label").textContent=t().yourPts;
   $("pts-week").textContent=t().thisWeek;
   $("ch-section-title").textContent=t().chSection;
-  $("badges-title").textContent=t().badgesTitle;
   $("ch-list").innerHTML=challenges.map((c,i)=>
     "<div class='ch-card"+(c.done?" done":"")+"' onclick='toggleChallenge("+i+")'><span class='ch-emoji'>"+c.emoji+"</span><div><div class='ch-title'>"+t()[c.key]+"</div><div class='ch-pts'>+"+c.pts+" pts</div></div><div class='ch-status' style='background:"+(c.done?"#4ADE80":"#F1F5F9")+";color:"+(c.done?"#fff":"#94A3B8")+"'>"+(c.done?"✓":"○")+"</div></div>"
   ).join("");
-  renderBadges("badges-grid");
+  // Badges uniquement dans le profil — pas dans défis
 }
 
 function toggleChallenge(i){
