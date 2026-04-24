@@ -391,7 +391,7 @@ input:focus,textarea:focus{outline:none}
       <span class="photo-zone-tip" id="photo-tip">Appuie pour prendre une photo</span>
     </div>
     <input type="file" id="photo-input" accept="image/*" capture="environment" style="display:none"/>
-    <div class="loc-chip">📍 <span id="loc-text">Position détectée</span></div>
+    <div class="loc-chip">📍<span id="loc-chip-icon" style="display:none"></span> <span id="loc-text">Position détectée</span></div>
     <input class="modal-input" id="input-name" placeholder="Nom du chat (optionnel)"/>
     <input class="modal-input" id="input-desc" placeholder="Une anecdote ? (optionnel)"/>
     <div>
@@ -545,19 +545,32 @@ function showToast(msg){
 
 // ── AUTH ──────────────────────────────────────────────────────
 async function initAuth(){
-  // Écoute les changements d'auth (retour OAuth Google)
-  sb.auth.onAuthStateChange(async (event, session)=>{
-    currentUser = session?.user || null;
-    updateAuthUI();
-    if(currentUser) await loadUserLikes();
-  });
-  // Session existante (ex: retour après redirect Google)
+  // Récupérer session existante ou retour OAuth
   const {data:{session}} = await sb.auth.getSession();
   if(session?.user){
     currentUser = session.user;
     await loadUserLikes();
   }
   updateAuthUI();
+
+  // Écouter les changements (retour OAuth redirect)
+  sb.auth.onAuthStateChange(async (event, session)=>{
+    const wasLoggedIn = !!currentUser;
+    currentUser = session?.user || null;
+    if(event === "SIGNED_IN" && !wasLoggedIn && currentUser){
+      likes = {};
+      await loadUserLikes();
+      showToast("✅ Connecté avec Google !");
+    }
+    if(event === "SIGNED_OUT"){
+      currentUser = null;
+      likes = {};
+      userProfile = {totalCats:0, streak:0, totalLikes:0};
+      $("profile-avatar").innerHTML = "🐱";
+      $("profile-name").textContent = "CatSpotter";
+    }
+    updateAuthUI();
+  });
 }
 
 async function signInWithGoogle(){
@@ -571,6 +584,10 @@ async function signOut(){
   await sb.auth.signOut();
   currentUser = null;
   likes = {};
+  userProfile = {totalCats:0, streak:0, totalLikes:0};
+  // Reset UI profil
+  $("profile-avatar").innerHTML = "🐱";
+  $("profile-name").textContent = "CatSpotter";
   updateAuthUI();
   showToast("👋 Déconnecté");
 }
@@ -632,7 +649,7 @@ async function toggleLikeDB(catId){
 }
 
 async function uploadPhoto(file, catId){
-  if(!file||!currentUser) return null;
+  if(!file) return null;
   try {
     const compressed = await compressImage(file);
     const path = catId+"/"+Date.now()+".jpg";
@@ -967,8 +984,30 @@ function applyLang(){
 // ── EVENTS ────────────────────────────────────────────────────
 $("lang-btn").addEventListener("click",()=>{lang=lang==="fr"?"en":"fr";applyLang();});
 $("fab").addEventListener("click",()=>{
-  if(navigator.geolocation) navigator.geolocation.getCurrentPosition(p=>{userLat=p.coords.latitude;userLng=p.coords.longitude;},()=>{});
-  openModal();
+  if(navigator.geolocation){
+    navigator.geolocation.getCurrentPosition(
+      p=>{
+        userLat=p.coords.latitude;
+        userLng=p.coords.longitude;
+        $("loc-text").textContent=t().locDetected;
+        $("loc-chip-icon").textContent="📍";
+        openModal();
+      },
+      ()=>{
+        // Géoloc refusée — utiliser le centre de la carte actuelle
+        const center=mapInstance.getCenter();
+        userLat=center.lat; userLng=center.lng;
+        $("loc-text").textContent=lang==="fr"?"Centre de la carte":"Map center";
+        $("loc-chip-icon").textContent="🗺️";
+        openModal();
+      },
+      {timeout:5000, maximumAge:60000}
+    );
+  } else {
+    const center=mapInstance.getCenter();
+    userLat=center.lat; userLng=center.lng;
+    openModal();
+  }
 });
 $("modal-cancel").addEventListener("click",closeModal);
 $("modal-publish").addEventListener("click",publishSpot);
