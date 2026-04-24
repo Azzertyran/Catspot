@@ -556,49 +556,54 @@ function showToast(msg){
 
 // ── AUTH ──────────────────────────────────────────────────────
 async function initAuth(){
-  // Gérer le retour OAuth (hash dans l'URL)
+  // Gérer le retour OAuth
   if(window.location.hash && window.location.hash.includes("access_token")){
-    // Supabase va automatiquement parser le hash et créer la session
-    await new Promise(r=>setTimeout(r,500)); // Laisser Supabase traiter
-    // Nettoyer l'URL
+    await new Promise(r=>setTimeout(r,800));
     history.replaceState(null,"",window.location.pathname);
   }
 
-  // Récupérer session existante
-  const {data:{session}} = await sb.auth.getSession();
+  // Récupérer session — avec retry
+  let session = null;
+  for(let i=0; i<3; i++){
+    const {data} = await sb.auth.getSession();
+    if(data?.session){ session=data.session; break; }
+    if(i<2) await new Promise(r=>setTimeout(r,300));
+  }
+
   if(session?.user){
     currentUser = session.user;
+    console.log("initAuth: connecté", currentUser.user_metadata?.full_name||currentUser.email);
     await loadUserLikes();
+  } else {
+    console.log("initAuth: non connecté");
   }
   updateAuthUI();
 
   // Écouter les changements d'auth
   sb.auth.onAuthStateChange(async (event, session)=>{
-    const wasLoggedIn = !!currentUser && !currentUser.is_anonymous;
+    console.log("auth event:", event);
     currentUser = session?.user || null;
 
     if(event === "SIGNED_IN" && currentUser && !currentUser.is_anonymous){
       likes = {};
       await loadUserLikes();
-      // Recharger les chats (carte + feed)
       await loadCats();
-      if(mapInstance && mapInstance.isStyleLoaded()){
-        renderMapCats();
-        updateCatOfDay();
-      }
+      if(mapInstance && mapInstance.isStyleLoaded()){ renderMapCats(); updateCatOfDay(); }
       updateAuthUI();
       if(currentTab==="feed") renderFeed();
       if(currentTab==="challenges") renderChallenges();
-      showToast("✅ "+(lang==="fr"?"Connecté avec Google !":"Signed in with Google!"));
+      showToast("✅ "+(lang==="fr"?"Connecté !":"Signed in!"));
     }
 
     if(event === "SIGNED_OUT"){
       currentUser = null;
       likes = {};
+      challenges = CHALLENGES_DEF.map(c=>({...c, done:false}));
       userProfile = {totalCats:0, streak:0, totalLikes:0};
       $("profile-avatar").innerHTML = "🐱";
       $("profile-name").textContent = "CatSpotter";
       updateAuthUI();
+      if(currentTab==="challenges") renderChallenges();
     }
   });
 }
@@ -667,9 +672,10 @@ function updateAuthUI(){
 async function loadCats(){
   try {
     const {data,error} = await sb.from("cats").select("*").order("created_at",{ascending:false});
-    if(error) throw error;
+    if(error){ console.error("loadCats erreur:", error); cats=[]; return; }
     cats = (data||[]).map(c=>({...c, likes:c.likes_count||0}));
-  } catch(e){ cats = []; }
+    console.log("loadCats: "+cats.length+" chats chargés");
+  } catch(e){ console.error("loadCats exception:", e); cats=[]; }
 }
 
 async function loadUserLikes(){
@@ -1264,14 +1270,18 @@ if(navigator.geolocation){
 (async()=>{
   setProgress(20, lang==="fr"?"Connexion...":"Connecting...");
 
-  // Charger auth ET cats en parallèle pour aller plus vite
-  await Promise.all([
-    initAuth(),
-    loadCats(),
-  ]);
+  // 1. Auth EN PREMIER — pour avoir currentUser disponible dès la publication
+  await initAuth();
 
-  setProgress(60, lang==="fr"?"Chargement de la carte...":"Loading map...");
-  initMap(); // La carte affichera les chats déjà en mémoire au "load"
+  setProgress(50, lang==="fr"?"Chargement des données...":"Loading data...");
+
+  // 2. Charger les chats
+  await loadCats();
+
+  setProgress(75, lang==="fr"?"Chargement de la carte...":"Loading map...");
+
+  // 3. Initialiser la carte — elle affichera les chats déjà en mémoire
+  initMap();
 
   setProgress(90, lang==="fr"?"Presque prêt...":"Almost ready...");
   renderChallenges();
