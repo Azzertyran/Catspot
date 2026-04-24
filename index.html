@@ -56,9 +56,9 @@ input:focus,textarea:focus{outline:none}
 .maplibregl-ctrl-group{border-radius:10px!important;box-shadow:0 2px 8px rgba(0,0,0,0.15)!important;border:none!important}
 .maplibregl-ctrl-zoom-in,.maplibregl-ctrl-zoom-out{border:none!important}
 #map{position:absolute;top:0;left:0;right:0;bottom:0;z-index:2;pointer-events:none}
-.cat-pin{width:38px;height:38px;border-radius:50%;border:2.5px solid #fff;display:flex;align-items:center;justify-content:center;font-size:18px;cursor:pointer;box-shadow:0 3px 10px rgba(0,0,0,0.22);transition:transform .2s cubic-bezier(.34,1.56,.64,1);background:#fff;position:relative}
-.cat-pin:hover{transform:scale(1.15)}
-.cat-pin.selected{transform:scale(1.25)}
+.cat-pin{width:38px;height:38px;border-radius:50%;border:2.5px solid #fff;display:flex;align-items:center;justify-content:center;font-size:18px;cursor:pointer;box-shadow:0 3px 10px rgba(0,0,0,0.22);transition:transform .2s cubic-bezier(.34,1.56,.64,1);background:#fff;position:absolute;transform:translate(-50%,-50%)}
+.cat-pin:hover{transform:translate(-50%,-50%) scale(1.15)}
+.cat-pin.selected{transform:translate(-50%,-50%) scale(1.25)}
 .cat-pin.legend::after{content:"⭐";position:absolute;top:-5px;right:-5px;font-size:10px}
 
 /* Cat of day - caché par défaut */
@@ -817,8 +817,12 @@ function addCatMarker(cat){
   el.innerHTML=cat.emoji||"🐱";
   el.style.cssText=`background:#fff;border-color:${color};color:${color}`;
   el.addEventListener("click", e=>{e.stopPropagation(); openPopup({...cat,color});});
-  // MapLibre : coordonnées en [lng, lat]
-  const marker=new maplibregl.Marker({element:el,anchor:"center"})
+  // MapLibre : coordonnées en [lng, lat], anchor center pour centrer le marqueur
+  const marker=new maplibregl.Marker({
+    element:el,
+    anchor:"center",
+    offset:[0,0]
+  })
     .setLngLat([cat.lng, cat.lat])
     .addTo(mapInstance);
   markers[cat.id]={marker,el,color};
