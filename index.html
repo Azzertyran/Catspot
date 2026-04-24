@@ -76,11 +76,14 @@ input:focus,textarea:focus{outline:none}
 .map-empty-text{font-size:13px;font-weight:600;color:var(--mid);line-height:1.4}
 
 /* Cat popup */
-#cat-popup{position:absolute;bottom:0;left:0;right:0;background:var(--light);border-radius:22px 22px 0 0;padding:6px 18px 24px;box-shadow:0 -4px 32px rgba(0,0,0,0.15);z-index:10;transform:translateY(100%);transition:transform .3s cubic-bezier(.34,1.1,.64,1);pointer-events:auto}
+#cat-popup{position:absolute;bottom:0;left:0;right:0;background:var(--light);border-radius:22px 22px 0 0;box-shadow:0 -4px 32px rgba(0,0,0,0.15);z-index:10;transform:translateY(100%);transition:transform .3s cubic-bezier(.34,1.1,.64,1);pointer-events:auto;max-height:90vh;overflow-y:auto}
 #cat-popup.open{transform:translateY(0)}
-.popup-handle{width:36px;height:4px;background:#ddd;border-radius:2px;margin:8px auto 14px}
+#cat-popup.expanded{transform:translateY(0)}
+.popup-handle{width:36px;height:4px;background:#ddd;border-radius:2px;margin:8px auto 14px;cursor:grab;flex-shrink:0}
+.popup-inner{padding:6px 18px 24px}
 .popup-row{display:flex;align-items:flex-start;gap:12px}
-.popup-emoji-box{width:52px;height:52px;border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:26px;flex-shrink:0}
+.popup-emoji-box{width:52px;height:52px;border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:26px;flex-shrink:0;overflow:hidden}
+.popup-emoji-box img{width:100%;height:100%;object-fit:cover;border-radius:12px}
 .popup-name{font-family:"Fraunces",serif;font-size:19px;font-weight:700}
 .popup-meta{font-size:12px;color:var(--muted);margin-top:3px}
 .popup-desc{font-size:13px;color:#666;margin-top:5px;font-style:italic}
@@ -90,6 +93,11 @@ input:focus,textarea:focus{outline:none}
 .popup-like-area{display:flex;flex-direction:column;align-items:center;gap:2px;padding:8px;margin-left:auto;flex-shrink:0}
 .popup-heart{font-size:24px;line-height:1}
 .popup-likes{font-size:11px;font-weight:700;color:var(--muted)}
+/* Photo dans le popup étendu */
+.popup-photo{width:100%;border-radius:14px;overflow:hidden;margin-top:14px;background:#1a1a1a;display:none;max-height:280px}
+.popup-photo img{width:100%;max-height:280px;object-fit:contain;display:block}
+.popup-photo.visible{display:block}
+.popup-expand-hint{text-align:center;font-size:11px;color:var(--muted);margin-top:10px;display:flex;align-items:center;justify-content:center;gap:4px}
 
 /* FAB */
 #fab{position:fixed;bottom:calc(var(--nav) + 14px);left:50%;transform:translateX(-50%);width:56px;height:56px;border-radius:50%;background:linear-gradient(145deg,var(--terra),var(--amber));border:3px solid var(--light);box-shadow:0 4px 20px rgba(212,87,42,.55);z-index:40;display:flex;align-items:center;justify-content:center;font-size:24px;transition:transform .15s,box-shadow .15s}
@@ -107,10 +115,12 @@ input:focus,textarea:focus{outline:none}
 .feed-catname{font-family:"Fraunces",serif;font-size:16px;font-weight:700}
 .feed-meta{font-size:11px;color:var(--muted);margin-top:2px}
 .feed-pin{margin-left:auto;font-size:18px}
-.feed-photo{height:200px;display:flex;align-items:center;justify-content:center;margin-top:12px;position:relative;overflow:hidden}
-.feed-photo img{width:100%;height:100%;object-fit:cover}
-.feed-photo-emoji{font-size:76px}
-.feed-photo-loc{position:absolute;bottom:10px;left:12px;background:rgba(0,0,0,.5);color:#fff;font-size:11px;font-weight:600;padding:4px 10px;border-radius:20px}
+/* Photo feed : hauteur fixe, contain pour ne pas couper */
+.feed-photo{margin-top:12px;position:relative;background:#111;overflow:hidden;min-height:120px;max-height:320px;display:flex;align-items:center;justify-content:center}
+.feed-photo img{width:100%;max-height:320px;object-fit:contain;display:block}
+.feed-photo-gradient{position:absolute;inset:0;pointer-events:none}
+.feed-photo-emoji{font-size:76px;padding:40px 0}
+.feed-photo-loc{position:absolute;bottom:10px;left:12px;background:rgba(0,0,0,.55);color:#fff;font-size:11px;font-weight:600;padding:4px 10px;border-radius:20px;backdrop-filter:blur(4px)}
 .feed-desc{font-size:13px;color:#666;padding:10px 14px 0;font-style:italic}
 .feed-actions{display:flex;align-items:center;justify-content:space-between;padding:10px 14px 13px;border-top:1px solid #f5f3f0;margin-top:10px}
 .feed-like-btn{display:flex;align-items:center;gap:5px;font-size:14px;font-weight:700}
@@ -266,19 +276,24 @@ input:focus,textarea:focus{outline:none}
           </div>
         </div>
         <div id="cat-popup">
-          <div class="popup-handle"></div>
-          <div class="popup-row">
-            <div class="popup-emoji-box" id="popup-emoji-box"></div>
-            <div style="flex:1;min-width:0">
-              <div class="popup-name serif" id="popup-name"></div>
-              <div class="popup-meta" id="popup-meta"></div>
-              <div class="popup-desc" id="popup-desc"></div>
-              <div class="popup-tags" id="popup-tags"></div>
+          <div class="popup-handle" id="popup-handle"></div>
+          <div class="popup-inner">
+            <div class="popup-row">
+              <div class="popup-emoji-box" id="popup-emoji-box"></div>
+              <div style="flex:1;min-width:0">
+                <div class="popup-name serif" id="popup-name"></div>
+                <div class="popup-meta" id="popup-meta"></div>
+                <div class="popup-desc" id="popup-desc"></div>
+                <div class="popup-tags" id="popup-tags"></div>
+              </div>
+              <button class="popup-like-area" id="popup-like-btn">
+                <span class="popup-heart" id="popup-heart">🤍</span>
+                <span class="popup-likes" id="popup-likes-count">0</span>
+              </button>
             </div>
-            <button class="popup-like-area" id="popup-like-btn">
-              <span class="popup-heart" id="popup-heart">🤍</span>
-              <span class="popup-likes" id="popup-likes-count">0</span>
-            </button>
+            <!-- Photo du chat — visible si disponible -->
+            <div class="popup-photo" id="popup-photo"></div>
+            <div class="popup-expand-hint" id="popup-expand-hint"></div>
           </div>
         </div>
       </div>
@@ -804,21 +819,44 @@ function openPopup(cat){
     markers[cat.id].el.style.color="#fff";
     markers[cat.id].el.style.transform="scale(1.25)";
   }
+
+  // Emoji box — photo miniature si disponible
   const box=$("popup-emoji-box");
-  box.textContent=cat.emoji||"🐱";
-  box.style.background=(cat.color||"#D4572A")+"22";
-  box.style.border="2px solid "+(cat.color||"#D4572A");
+  if(cat.photo_url){
+    box.innerHTML=`<img src="${cat.photo_url}" alt="${cat.name||''}" onerror="this.parentElement.innerHTML='${cat.emoji||"🐱"}'">`;
+    box.style.background="transparent";
+    box.style.border=`2px solid ${cat.color||"#D4572A"}`;
+  } else {
+    box.innerHTML=cat.emoji||"🐱";
+    box.style.background=(cat.color||"#D4572A")+"22";
+    box.style.border=`2px solid ${cat.color||"#D4572A"}`;
+  }
+
+  const poster = cat.posted_by || (lang==="fr"?"Anonyme":"Anonymous");
   $("popup-name").textContent=cat.name||"Chat inconnu";
-  $("popup-meta").textContent=t().sightings(cat.sightings||1)+" · "+fmtAgo(cat.created_at||new Date().toISOString());
+  $("popup-meta").textContent="Par "+poster+" · "+t().sightings(cat.sightings||1)+" · "+fmtAgo(cat.created_at||new Date().toISOString());
   $("popup-desc").textContent=cat.desc||"";
   $("popup-desc").style.display=cat.desc?"block":"none";
   const tagsEl=$("popup-tags"); tagsEl.innerHTML="";
   const charMap={friendly:t().friendly,wild:t().wild,shy:t().shy,playful:t().playful};
-  if(cat.char) tagsEl.innerHTML+="<span class='popup-tag'>"+charMap[cat.char]+"</span>";
-  if(cat.legend) tagsEl.innerHTML+="<span class='popup-tag legend'>⭐ "+t().legend+"</span>";
+  if(cat.char) tagsEl.innerHTML+=`<span class='popup-tag'>${charMap[cat.char]}</span>`;
+  if(cat.legend) tagsEl.innerHTML+=`<span class='popup-tag legend'>⭐ ${t().legend}</span>`;
   updatePopupLike(cat);
+
+  // Photo grande dans le popup
+  const photoEl=$("popup-photo");
+  const hintEl=$("popup-expand-hint");
+  if(cat.photo_url){
+    photoEl.innerHTML=`<img src="${cat.photo_url}" alt="${cat.name||''}">`;
+    photoEl.classList.add("visible");
+    hintEl.style.display="none";
+  } else {
+    photoEl.classList.remove("visible");
+    photoEl.innerHTML="";
+    hintEl.style.display="none";
+  }
+
   $("cat-popup").classList.add("open");
-  // MapLibre : flyTo avec [lng, lat]
   mapInstance.flyTo({center:[cat.lng, cat.lat], offset:[0,80], duration:400});
 }
 
@@ -862,12 +900,13 @@ function renderFeed(append=false){
       ?`<img src="${cat.photo_url}" alt="${cat.name||''}" style="width:100%;height:100%;object-fit:cover;display:block" onerror="this.style.display='none';this.nextSibling.style.display='flex'">`+
         `<span class='feed-photo-emoji' style="display:none">${cat.emoji||"🐱"}</span>`
       :`<span class='feed-photo-emoji'>${cat.emoji||"🐱"}</span>`;
+    const poster = cat.posted_by || (lang==="fr"?"Anonyme":"Anonymous");
     return `<div class='feed-card'>
       <div class='feed-head'>
         <div class='feed-avatar' style='background:${color}22;border-color:${color}'>${cat.emoji||"🐱"}</div>
         <div>
           <div class='feed-catname serif'>${cat.name||"Chat inconnu"}</div>
-          <div class='feed-meta'>${fmtAgo(cat.created_at||new Date().toISOString())} · ${t().sightings(cat.sightings||1)}</div>
+          <div class='feed-meta'>Par <strong>${poster}</strong> · ${fmtAgo(cat.created_at||new Date().toISOString())} · ${t().sightings(cat.sightings||1)}</div>
         </div>
         <span class='feed-pin'>📍</span>
       </div>
@@ -1003,10 +1042,13 @@ async function publishSpot(){
   const newLat=userLat+(Math.random()-0.5)*0.002;
   const newLng=userLng+(Math.random()-0.5)*0.002;
 
-  // 1. Sauvegarder le chat en base d'abord
+  const posted_by = currentUser?.user_metadata?.full_name 
+    || currentUser?.email?.split("@")[0] 
+    || (lang==="fr"?"Anonyme":"Anonymous");
+
   const saved=await saveCat({
     name, emoji:"🐱", color, lat:newLat, lng:newLng,
-    char:selectedChar||"friendly", sightings:1, likes_count:0, legend:false, desc
+    char:selectedChar||"friendly", sightings:1, likes_count:0, legend:false, desc, posted_by
   });
 
   const cat=saved ? {...saved, likes:0} : {
@@ -1075,6 +1117,44 @@ function applyLang(){
 }
 
 // ── EVENTS ────────────────────────────────────────────────────
+
+// Swipe popup handle pour agrandir/fermer
+(()=>{
+  let startY=0, startH=0, isDragging=false;
+  const getPopup=()=>$("cat-popup");
+  const getHandle=()=>$("popup-handle");
+  function onStart(e){
+    if(!getPopup()?.classList.contains("open")) return;
+    isDragging=true;
+    startY=e.touches?e.touches[0].clientY:e.clientY;
+    startH=getPopup().getBoundingClientRect().height;
+    getPopup().style.transition="none";
+  }
+  function onMove(e){
+    if(!isDragging) return;
+    e.preventDefault();
+    const y=e.touches?e.touches[0].clientY:e.clientY;
+    const dy=startY-y;
+    const maxH=window.innerHeight*0.85;
+    const minH=160;
+    const newH=Math.min(maxH,Math.max(minH,startH+dy));
+    getPopup().style.height=newH+"px";
+    getPopup().style.overflowY="auto";
+  }
+  function onEnd(){
+    if(!isDragging) return;
+    isDragging=false;
+    const h=getPopup().getBoundingClientRect().height;
+    getPopup().style.transition="";
+    if(h<150){ closePopup(); getPopup().style.height=""; }
+  }
+  document.addEventListener("touchstart",e=>{
+    if(getHandle()&&getHandle().contains(e.target)) onStart(e);
+  },{passive:true});
+  document.addEventListener("touchmove",e=>{if(isDragging)onMove(e);},{passive:false});
+  document.addEventListener("touchend",onEnd);
+})();
+
 $("lang-btn").addEventListener("click",()=>{lang=lang==="fr"?"en":"fr";applyLang();});
 $("fab").addEventListener("click",()=>{
   if(navigator.geolocation){
