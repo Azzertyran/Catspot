@@ -402,7 +402,10 @@ input:focus,textarea:focus{outline:none}
       <span class="photo-zone-tip" id="photo-tip">Appuie pour prendre une photo</span>
     </div>
     <input type="file" id="photo-input" accept="image/*" style="display:none"/>
-    <div class="loc-chip">📍<span id="loc-chip-icon" style="display:none"></span> <span id="loc-text">Position détectée</span></div>
+    <div style="display:flex;align-items:center;gap:8px">
+      <div class="loc-chip" style="flex:1">📍 <span id="loc-text">Position détectée</span></div>
+      <button id="loc-manual-btn" style="background:var(--warm);border:none;border-radius:20px;padding:6px 12px;font-size:12px;font-weight:700;color:var(--mid);cursor:pointer;white-space:nowrap;font-family:'DM Sans',sans-serif">🗺️ Changer</button>
+    </div>
     <input class="modal-input" id="input-name" placeholder="Nom du chat (optionnel)"/>
     <input class="modal-input" id="input-desc" placeholder="Une anecdote ? (optionnel)"/>
     <div>
@@ -978,13 +981,16 @@ function toggleFeedLike(id){
 // Charger les défis depuis localStorage
 function loadChallengesFromStorage(){
   try {
-    const saved = localStorage.getItem("catspot_challenges");
+    const saved = localStorage.getItem("catspot_challenges") || sessionStorage.getItem("catspot_challenges");
     if(saved) challenges = JSON.parse(saved);
   } catch(e){}
 }
 
 function saveChallengestoStorage(){
-  try { localStorage.setItem("catspot_challenges", JSON.stringify(challenges)); } catch(e){}
+  try {
+    localStorage.setItem("catspot_challenges", JSON.stringify(challenges));
+    sessionStorage.setItem("catspot_challenges", JSON.stringify(challenges));
+  } catch(e){}
 }
 
 function renderChallenges(){
@@ -1200,8 +1206,17 @@ function applyLang(){
 
 $("lang-btn").addEventListener("click",()=>{lang=lang==="fr"?"en":"fr";applyLang();});
 $("fab").addEventListener("click",()=>{
-  // Proposer le choix : GPS ou placer sur la carte
-  showLocationChoice();
+  // Géoloc immédiate puis ouvre le modal
+  if(navigator.geolocation){
+    navigator.geolocation.getCurrentPosition(
+      p=>{ userLat=p.coords.latitude; userLng=p.coords.longitude; $("loc-text").textContent=t().locDetected; },
+      ()=>{ const c=mapInstance.getCenter(); userLat=c.lat; userLng=c.lng; $("loc-text").textContent=lang==="fr"?"Centre de la carte":"Map center"; },
+      {timeout:3000, maximumAge:60000}
+    );
+  } else {
+    const c=mapInstance.getCenter(); userLat=c.lat; userLng=c.lng;
+  }
+  openModal();
 });
 
 function showLocationChoice(){
@@ -1285,6 +1300,10 @@ function startManualPin(){
 }
 $("modal-cancel").addEventListener("click",closeModal);
 $("modal-publish").addEventListener("click",publishSpot);
+$("loc-manual-btn").addEventListener("click",()=>{
+  closeModal();
+  startManualPin();
+});
 $("modal-overlay").addEventListener("click",e=>{if(e.target===$("modal-overlay"))closeModal();});
 $("popup-like-btn").addEventListener("click",async ()=>{
   if(!selectedCat) return;
