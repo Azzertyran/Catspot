@@ -975,6 +975,18 @@ function toggleFeedLike(id){
 }
 
 // ── CHALLENGES ────────────────────────────────────────────────
+// Charger les défis depuis localStorage
+function loadChallengesFromStorage(){
+  try {
+    const saved = localStorage.getItem("catspot_challenges");
+    if(saved) challenges = JSON.parse(saved);
+  } catch(e){}
+}
+
+function saveChallengestoStorage(){
+  try { localStorage.setItem("catspot_challenges", JSON.stringify(challenges)); } catch(e){}
+}
+
 function renderChallenges(){
   $("pts-total").textContent=totalPts();
   $("pts-label").textContent=t().yourPts;
@@ -988,6 +1000,7 @@ function renderChallenges(){
 
 function toggleChallenge(i){
   challenges[i].done=!challenges[i].done;
+  saveChallengestoStorage();
   renderChallenges();
 }
 
@@ -1101,6 +1114,8 @@ async function publishSpot(){
 
   cats.unshift(cat);
   userProfile.totalCats = (userProfile.totalCats||0) + 1;
+  // Supprimer le pin manuel temporaire
+  if(manualPinMarker){ manualPinMarker.remove(); manualPinMarker=null; }
   closeModal();
   showToast(t().published);
 
@@ -1185,31 +1200,89 @@ function applyLang(){
 
 $("lang-btn").addEventListener("click",()=>{lang=lang==="fr"?"en":"fr";applyLang();});
 $("fab").addEventListener("click",()=>{
-  if(navigator.geolocation){
-    navigator.geolocation.getCurrentPosition(
-      p=>{
-        userLat=p.coords.latitude;
-        userLng=p.coords.longitude;
-        $("loc-text").textContent=t().locDetected;
-        $("loc-chip-icon").textContent="📍";
-        openModal();
-      },
-      ()=>{
-        // Géoloc refusée — utiliser le centre de la carte actuelle
-        const center=mapInstance.getCenter();
-        userLat=center.lat; userLng=center.lng;
-        $("loc-text").textContent=lang==="fr"?"Centre de la carte":"Map center";
-        $("loc-chip-icon").textContent="🗺️";
-        openModal();
-      },
-      {timeout:5000, maximumAge:60000}
-    );
-  } else {
-    const center=mapInstance.getCenter();
-    userLat=center.lat; userLng=center.lng;
-    openModal();
-  }
+  // Proposer le choix : GPS ou placer sur la carte
+  showLocationChoice();
 });
+
+function showLocationChoice(){
+  // Supprimer ancien choix si présent
+  const old = $("loc-choice");
+  if(old) old.remove();
+
+  const div = document.createElement("div");
+  div.id = "loc-choice";
+  div.style.cssText = "position:fixed;bottom:calc(var(--nav)+80px);left:50%;transform:translateX(-50%);background:#fff;border-radius:18px;padding:16px;box-shadow:0 4px 24px rgba(0,0,0,0.18);z-index:50;display:flex;flex-direction:column;gap:10px;width:calc(100% - 32px);max-width:398px";
+  div.innerHTML = `
+    <div style="font-family:'Fraunces',serif;font-size:16px;font-weight:700;color:var(--dark);text-align:center;margin-bottom:4px">${lang==="fr"?"Où est le chat ?":"Where is the cat?"}</div>
+    <button id="loc-gps-btn" style="display:flex;align-items:center;gap:10px;background:var(--terra);color:#fff;border:none;border-radius:12px;padding:13px 16px;font-size:14px;font-weight:700;cursor:pointer;font-family:'DM Sans',sans-serif">
+      <span style="font-size:20px">📍</span>
+      <div style="text-align:left"><div>${lang==="fr"?"Ma position actuelle":"My current location"}</div><div style="font-size:11px;opacity:.8">${lang==="fr"?"Utilise le GPS automatiquement":"Uses GPS automatically"}</div></div>
+    </button>
+    <button id="loc-map-btn" style="display:flex;align-items:center;gap:10px;background:var(--warm);color:var(--dark);border:none;border-radius:12px;padding:13px 16px;font-size:14px;font-weight:700;cursor:pointer;font-family:'DM Sans',sans-serif">
+      <span style="font-size:20px">🗺️</span>
+      <div style="text-align:left"><div>${lang==="fr"?"Placer sur la carte":"Place on map"}</div><div style="font-size:11px;opacity:.6">${lang==="fr"?"Pose une pin manuellement":"Drop a pin manually"}</div></div>
+    </button>
+    <button onclick="document.getElementById('loc-choice').remove()" style="background:none;border:none;color:var(--muted);font-size:13px;cursor:pointer;padding:4px;font-family:'DM Sans',sans-serif">${lang==="fr"?"Annuler":"Cancel"}</button>
+  `;
+  document.body.appendChild(div);
+
+  // GPS automatique
+  $("loc-gps-btn").addEventListener("click",()=>{
+    div.remove();
+    if(navigator.geolocation){
+      navigator.geolocation.getCurrentPosition(
+        p=>{ userLat=p.coords.latitude; userLng=p.coords.longitude; $("loc-text").textContent=t().locDetected; openModal(); },
+        ()=>{ const c=mapInstance.getCenter(); userLat=c.lat; userLng=c.lng; $("loc-text").textContent=lang==="fr"?"Centre de la carte":"Map center"; openModal(); },
+        {timeout:5000, maximumAge:60000}
+      );
+    } else {
+      const c=mapInstance.getCenter(); userLat=c.lat; userLng=c.lng; openModal();
+    }
+  });
+
+  // Placer manuellement
+  $("loc-map-btn").addEventListener("click",()=>{
+    div.remove();
+    startManualPin();
+  });
+}
+
+let manualPinMarker = null;
+let manualPinActive = false;
+
+function startManualPin(){
+  manualPinActive = true;
+  // Afficher une instruction
+  const hint = document.createElement("div");
+  hint.id = "pin-hint";
+  hint.style.cssText = "position:fixed;top:70px;left:50%;transform:translateX(-50%);background:rgba(28,25,21,0.9);color:#fff;padding:10px 20px;border-radius:30px;font-size:13px;font-weight:600;z-index:50;text-align:center;backdrop-filter:blur(4px)";
+  hint.innerHTML = (lang==="fr"?"Appuie sur la carte pour placer le chat":"Tap on the map to place the cat")+" 🐱<br><small style='opacity:.7'>"+(lang==="fr"?"Appuie à nouveau pour confirmer":"Tap again to confirm")+"</small>";
+  document.body.appendChild(hint);
+
+  // Écouter un clic sur la carte
+  mapInstance.once("click", e=>{
+    userLat = e.lngLat.lat;
+    userLng = e.lngLat.lng;
+
+    // Supprimer l'ancien pin manuel si existe
+    if(manualPinMarker) manualPinMarker.remove();
+
+    // Créer un pin temporaire
+    const el = document.createElement("div");
+    el.style.cssText = "font-size:32px;cursor:pointer;filter:drop-shadow(0 4px 8px rgba(0,0,0,0.3))";
+    el.innerHTML = "📍";
+    manualPinMarker = new maplibregl.Marker({element:el, anchor:"bottom"})
+      .setLngLat([userLng, userLat])
+      .addTo(mapInstance);
+
+    // Retirer le hint et ouvrir le modal
+    const hintEl = $("pin-hint");
+    if(hintEl) hintEl.remove();
+    $("loc-text").textContent = lang==="fr"?"Position choisie sur la carte":"Position chosen on map";
+    manualPinActive = false;
+    openModal();
+  });
+}
 $("modal-cancel").addEventListener("click",closeModal);
 $("modal-publish").addEventListener("click",publishSpot);
 $("modal-overlay").addEventListener("click",e=>{if(e.target===$("modal-overlay"))closeModal();});
@@ -1298,7 +1371,8 @@ if(navigator.geolocation){
     );
   }
 
-  // 1. Lancer la carte IMMÉDIATEMENT — pas d'attente
+  // Lancer la carte IMMÉDIATEMENT — pas d'attente
+  loadChallengesFromStorage();
   initMap();
   renderChallenges();
   renderProfile();
