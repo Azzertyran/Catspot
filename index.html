@@ -530,25 +530,19 @@ function showToast(msg){
 
 // ── AUTH ──────────────────────────────────────────────────────
 async function initAuth(){
-  // Écoute les changements d'auth
+  // Écoute les changements d'auth (retour OAuth Google)
   sb.auth.onAuthStateChange(async (event, session)=>{
     currentUser = session?.user || null;
     updateAuthUI();
     if(currentUser) await loadUserLikes();
   });
-  // Session existante
+  // Session existante (ex: retour après redirect Google)
   const {data:{session}} = await sb.auth.getSession();
   if(session?.user){
     currentUser = session.user;
-  } else {
-    // Auth anonyme silencieuse
-    try {
-      const {data} = await sb.auth.signInAnonymously();
-      currentUser = data?.user || null;
-    } catch(e){}
+    await loadUserLikes();
   }
   updateAuthUI();
-  if(currentUser) await loadUserLikes();
 }
 
 async function signInWithGoogle(){
