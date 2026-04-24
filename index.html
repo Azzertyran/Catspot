@@ -673,7 +673,8 @@ async function loadCats(){
   try {
     const {data,error} = await sb.from("cats").select("*").order("created_at",{ascending:false});
     if(error){ console.error("loadCats erreur:", error); cats=[]; return; }
-    cats = (data||[]).map(c=>({...c, likes:c.likes_count||0}));
+    // Mapper description -> desc pour compatibilité avec le reste du code
+    cats = (data||[]).map(c=>({...c, likes:c.likes_count||0, desc:c.description||c.desc||null}));
     console.log("loadCats: "+cats.length+" chats chargés");
   } catch(e){ console.error("loadCats exception:", e); cats=[]; }
 }
@@ -688,10 +689,12 @@ async function loadUserLikes(){
 
 async function saveCat(catData){
   try {
+    console.log("saveCat: tentative avec", JSON.stringify(catData));
     const {data,error} = await sb.from("cats").insert([catData]).select().single();
-    if(error) throw error;
+    if(error){ console.error("saveCat ERREUR:", error.message, error.details, error.hint); return null; }
+    console.log("saveCat: succès, id=", data.id);
     return data;
-  } catch(e){return null;}
+  } catch(e){ console.error("saveCat EXCEPTION:", e); return null; }
 }
 
 async function toggleLikeDB(catId){
@@ -1054,13 +1057,13 @@ async function publishSpot(){
 
   const saved=await saveCat({
     name, emoji:"🐱", color, lat:newLat, lng:newLng,
-    char:selectedChar||"friendly", sightings:1, likes_count:0, legend:false, desc, posted_by
+    char:selectedChar||"friendly", sightings:1, likes_count:0, legend:false, description:desc, posted_by
   });
 
-  const cat=saved ? {...saved, likes:0} : {
+  const cat=saved ? {...saved, likes:0, desc:saved.description} : {
     id:"local-"+Date.now(), name, emoji:"🐱", color,
     lat:newLat, lng:newLng, sightings:1, likes_count:0, likes:0,
-    created_at:new Date().toISOString(), desc, char:selectedChar||"friendly", legend:false
+    created_at:new Date().toISOString(), desc, description:desc, char:selectedChar||"friendly", legend:false
   };
 
   // 2. Upload photo si disponible (avec ou sans compte)
