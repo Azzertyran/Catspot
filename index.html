@@ -778,14 +778,20 @@ function initMap(){
 
   mapInstance.addControl(new maplibregl.NavigationControl({showCompass:false}), "top-right");
 
-  // Timeout sécurité 8s — masquer le loading même si la carte tarde
-  const loadTimeout = setTimeout(()=>hideLoading(), 8000);
+  // Timeout sécurité 5s — masquer le loading même si la carte tarde
+  const loadTimeout = setTimeout(()=>{
+    hideLoading();
+    // Forcer l'affichage des chats si la carte est prête
+    if(mapInstance && mapInstance.isStyleLoaded()){
+      renderMapCats();
+      updateCatOfDay();
+    }
+  }, 5000);
 
   mapInstance.on("load", ()=>{
     clearTimeout(loadTimeout);
     mapInstance.resize();
     hideLoading();
-    // Afficher les chats déjà chargés (loadCats est appelé en parallèle dans l'init)
     renderMapCats();
     updateCatOfDay();
   });
