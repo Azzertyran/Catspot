@@ -558,26 +558,22 @@ function showToast(msg){
 async function initAuth(){
   // Gérer le retour OAuth
   if(window.location.hash && window.location.hash.includes("access_token")){
-    await new Promise(r=>setTimeout(r,800));
+    await new Promise(r=>setTimeout(r,500));
     history.replaceState(null,"",window.location.pathname);
   }
 
-  // Récupérer session — avec retry
-  let session = null;
-  for(let i=0; i<3; i++){
+  // Récupérer session — une seule tentative, pas de retry bloquant
+  try {
     const {data} = await sb.auth.getSession();
-    if(data?.session){ session=data.session; break; }
-    if(i<2) await new Promise(r=>setTimeout(r,300));
-  }
-
-  if(session?.user){
-    currentUser = session.user;
-    console.log("initAuth: connecté", currentUser.user_metadata?.full_name||currentUser.email);
-    await loadUserLikes();
-    await loadUserProfile();
-  } else {
-    console.log("initAuth: non connecté");
-  }
+    if(data?.session?.user){
+      currentUser = data.session.user;
+      console.log("initAuth: connecté", currentUser.user_metadata?.full_name||currentUser.email);
+      await Promise.all([loadUserLikes(), loadUserProfile()]);
+    } else {
+      console.log("initAuth: non connecté");
+    }
+  } catch(e){ console.warn("initAuth error:", e); }
+  
   updateAuthUI();
 
   // Écouter les changements d'auth
@@ -587,8 +583,7 @@ async function initAuth(){
 
     if(event === "SIGNED_IN" && currentUser && !currentUser.is_anonymous){
       likes = {};
-      await loadUserLikes();
-      await loadUserProfile();
+      await Promise.all([loadUserLikes(), loadUserProfile()]);
       await loadCats();
       if(mapInstance && mapInstance.isStyleLoaded()){ renderMapCats(); updateCatOfDay(); }
       updateAuthUI();
@@ -767,6 +762,9 @@ function compressImage(file, maxPx=1200, quality=0.82){
 
 // ── MAP ───────────────────────────────────────────────────────
 function initMap(){
+  // Masquer le loading immédiatement — pas d'attente
+  setTimeout(()=>hideLoading(), 1500);
+
   mapInstance = new maplibregl.Map({
     container:"maplibre",
     style:"https://tiles.openfreemap.org/styles/liberty",
@@ -778,20 +776,9 @@ function initMap(){
 
   mapInstance.addControl(new maplibregl.NavigationControl({showCompass:false}), "top-right");
 
-  // Timeout sécurité 5s — masquer le loading même si la carte tarde
-  const loadTimeout = setTimeout(()=>{
-    hideLoading();
-    // Forcer l'affichage des chats si la carte est prête
-    if(mapInstance && mapInstance.isStyleLoaded()){
-      renderMapCats();
-      updateCatOfDay();
-    }
-  }, 5000);
-
   mapInstance.on("load", ()=>{
-    clearTimeout(loadTimeout);
-    mapInstance.resize();
     hideLoading();
+    mapInstance.resize();
     renderMapCats();
     updateCatOfDay();
   });
@@ -1298,24 +1285,31 @@ if(navigator.geolocation){
 }
 
 (async()=>{
-  setProgress(20, lang==="fr"?"Connexion...":"Connecting...");
+  // Géoloc non bloquante
+  if(navigator.geolocation){
+    navigator.geolocation.getCurrentPosition(
+      p=>{ userLat=p.coords.latitude; userLng=p.coords.longitude; if(mapInstance) mapInstance.setCenter([userLng,userLat]); },
+      ()=>{}, {timeout:3000, maximumAge:60000}
+    );
+  }
 
-  // 1. Auth EN PREMIER — pour avoir currentUser disponible dès la publication
-  await initAuth();
-
-  setProgress(50, lang==="fr"?"Chargement des données...":"Loading data...");
-
-  // 2. Charger les chats
-  await loadCats();
-
-  setProgress(75, lang==="fr"?"Chargement de la carte...":"Loading map...");
-
-  // 3. Initialiser la carte — elle affichera les chats déjà en mémoire
+  // 1. Lancer la carte IMMÉDIATEMENT — pas d'attente
   initMap();
-
-  setProgress(90, lang==="fr"?"Presque prêt...":"Almost ready...");
   renderChallenges();
   renderProfile();
+
+  // 2. Auth + données en arrière-plan, sans bloquer l'affichage
+  try {
+    await initAuth();
+    await loadCats();
+    // Mettre à jour la carte si elle est déjà chargée
+    if(mapInstance && mapInstance.isStyleLoaded()){
+      renderMapCats();
+      updateCatOfDay();
+    }
+    if(currentTab==="feed") renderFeed();
+    renderProfile();
+  } catch(e){ console.warn("Init background error:", e); }
 })();
 </script>
 </body>
