@@ -545,7 +545,15 @@ function showToast(msg){
 
 // ── AUTH ──────────────────────────────────────────────────────
 async function initAuth(){
-  // Récupérer session existante ou retour OAuth
+  // Gérer le retour OAuth (hash dans l'URL)
+  if(window.location.hash && window.location.hash.includes("access_token")){
+    // Supabase va automatiquement parser le hash et créer la session
+    await new Promise(r=>setTimeout(r,500)); // Laisser Supabase traiter
+    // Nettoyer l'URL
+    history.replaceState(null,"",window.location.pathname);
+  }
+
+  // Récupérer session existante
   const {data:{session}} = await sb.auth.getSession();
   if(session?.user){
     currentUser = session.user;
@@ -553,30 +561,41 @@ async function initAuth(){
   }
   updateAuthUI();
 
-  // Écouter les changements (retour OAuth redirect)
+  // Écouter les changements d'auth
   sb.auth.onAuthStateChange(async (event, session)=>{
-    const wasLoggedIn = !!currentUser;
+    const wasLoggedIn = !!currentUser && !currentUser.is_anonymous;
     currentUser = session?.user || null;
-    if(event === "SIGNED_IN" && !wasLoggedIn && currentUser){
+
+    if(event === "SIGNED_IN" && !wasLoggedIn && currentUser && !currentUser.is_anonymous){
       likes = {};
       await loadUserLikes();
-      showToast("✅ Connecté avec Google !");
+      updateAuthUI();
+      showToast("✅ "+( lang==="fr"?"Connecté avec Google !":"Signed in with Google!"));
+      // Recharger les chats pour avoir les likes à jour
+      await loadCats();
+      if(mapInstance && mapInstance.isStyleLoaded()) renderMapCats();
     }
+
     if(event === "SIGNED_OUT"){
       currentUser = null;
       likes = {};
       userProfile = {totalCats:0, streak:0, totalLikes:0};
       $("profile-avatar").innerHTML = "🐱";
       $("profile-name").textContent = "CatSpotter";
+      updateAuthUI();
     }
-    updateAuthUI();
   });
 }
 
 async function signInWithGoogle(){
+  // Nettoyer l'URL avant le redirect (évite les conflits avec les hash OAuth)
+  const redirectTo = window.location.origin + window.location.pathname;
   await sb.auth.signInWithOAuth({
     provider:"google",
-    options:{redirectTo: window.location.href}
+    options:{
+      redirectTo,
+      queryParams:{prompt:"select_account"}, // Force le choix de compte Google
+    }
   });
 }
 
