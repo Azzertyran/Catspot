@@ -574,6 +574,7 @@ async function initAuth(){
     currentUser = session.user;
     console.log("initAuth: connecté", currentUser.user_metadata?.full_name||currentUser.email);
     await loadUserLikes();
+    await loadUserProfile();
   } else {
     console.log("initAuth: non connecté");
   }
@@ -587,6 +588,7 @@ async function initAuth(){
     if(event === "SIGNED_IN" && currentUser && !currentUser.is_anonymous){
       likes = {};
       await loadUserLikes();
+      await loadUserProfile();
       await loadCats();
       if(mapInstance && mapInstance.isStyleLoaded()){ renderMapCats(); updateCatOfDay(); }
       updateAuthUI();
@@ -679,7 +681,22 @@ async function loadCats(){
   } catch(e){ console.error("loadCats exception:", e); cats=[]; }
 }
 
-async function loadUserLikes(){
+async function loadUserProfile(){
+  if(!currentUser || currentUser.is_anonymous) return;
+  try {
+    // Nombre de chats postés par cet user
+    const {count:catsCount} = await sb.from("cats")
+      .select("*", {count:"exact", head:true})
+      .eq("posted_by", currentUser.user_metadata?.full_name || currentUser.email?.split("@")[0] || "");
+    // Nombre de likes reçus
+    const {count:likesCount} = await sb.from("likes")
+      .select("*", {count:"exact", head:true})
+      .eq("user_id", currentUser.id);
+    userProfile.totalCats = catsCount || 0;
+    userProfile.totalLikes = likesCount || 0;
+    renderProfile();
+  } catch(e){ console.warn("loadUserProfile:", e); }
+}
   if(!currentUser) return;
   try {
     const {data} = await sb.from("likes").select("cat_id").eq("user_id",currentUser.id);
@@ -1081,7 +1098,7 @@ async function publishSpot(){
   }
 
   cats.unshift(cat);
-  userProfile.totalCats++;
+  userProfile.totalCats = (userProfile.totalCats||0) + 1;
   closeModal();
   showToast(t().published);
 
