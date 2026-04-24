@@ -44,26 +44,25 @@ input:focus,textarea:focus{outline:none}
 #lang-btn:hover{background:var(--terra);color:#fff}
 
 /* TABS */
-#tabs{flex:1;position:relative;overflow:hidden;min-height:0}
+#tabs{flex:1;position:relative;min-height:0;overflow:hidden}
 .tab-panel{position:absolute;inset:0;overflow-y:auto;overflow-x:hidden;display:none;padding-bottom:calc(var(--nav) + 16px)}
 .tab-panel.active{display:block}
 #tab-map{padding:0;display:none}
-#tab-map.active{display:flex;flex-direction:column;position:absolute;inset:0;overflow:hidden}
+#tab-map.active{display:block;position:absolute;inset:0}
 
 /* MAP */
-#map{flex:1;position:relative;overflow:hidden}
-#maplibre{position:absolute;top:0;left:0;right:0;bottom:0}
+#maplibre{position:absolute;top:0;left:0;right:0;bottom:0;z-index:1}
 .maplibregl-map{width:100%!important;height:100%!important}
-.maplibregl-control-container .maplibregl-ctrl-top-right{top:12px;right:12px}
+.maplibregl-ctrl-group{border-radius:10px!important;box-shadow:0 2px 8px rgba(0,0,0,0.15)!important;border:none!important}
 .maplibregl-ctrl-zoom-in,.maplibregl-ctrl-zoom-out{border:none!important}
-.maplibregl-ctrl-group{border-radius:10px!important;box-shadow:0 2px 8px rgba(0,0,0,0.15)!important}
+#map{position:absolute;top:0;left:0;right:0;bottom:0;z-index:2;pointer-events:none}
 .cat-pin{width:38px;height:38px;border-radius:50%;border:2.5px solid #fff;display:flex;align-items:center;justify-content:center;font-size:18px;cursor:pointer;box-shadow:0 3px 10px rgba(0,0,0,0.22);transition:transform .2s cubic-bezier(.34,1.56,.64,1);background:#fff;position:relative}
 .cat-pin:hover{transform:scale(1.15)}
 .cat-pin.selected{transform:scale(1.25)}
 .cat-pin.legend::after{content:"⭐";position:absolute;top:-5px;right:-5px;font-size:10px}
 
 /* Cat of day - caché par défaut */
-#cod-banner{position:absolute;top:12px;left:12px;background:rgba(249,246,240,0.96);backdrop-filter:blur(10px);border-radius:14px;padding:9px 13px;display:none;align-items:center;gap:10px;box-shadow:0 2px 16px rgba(0,0,0,0.12);z-index:5;border:1px solid rgba(0,0,0,0.06);max-width:210px}
+#cod-banner{position:absolute;top:12px;left:12px;background:rgba(249,246,240,0.96);backdrop-filter:blur(10px);border-radius:14px;padding:9px 13px;display:none;align-items:center;gap:10px;box-shadow:0 2px 16px rgba(0,0,0,0.12);z-index:5;border:1px solid rgba(0,0,0,0.06);max-width:210px;pointer-events:auto}
 #cod-banner.visible{display:flex}
 .cod-star{font-size:22px}
 .cod-label{font-size:9px;font-weight:700;color:var(--amber);text-transform:uppercase;letter-spacing:.8px}
@@ -72,13 +71,12 @@ input:focus,textarea:focus{outline:none}
 
 /* Empty map state */
 #map-empty{position:absolute;top:50%;left:50%;transform:translate(-50%,-55%);text-align:center;pointer-events:none;z-index:4;display:none}
-#map-empty.visible{display:block}
-.map-empty-bubble{background:rgba(249,246,240,0.95);backdrop-filter:blur(10px);border-radius:16px;padding:12px 18px;box-shadow:0 2px 16px rgba(0,0,0,0.1);border:1px solid rgba(0,0,0,0.06)}
+#map-empty.visible{display:block}.map-empty-bubble{background:rgba(249,246,240,0.95);backdrop-filter:blur(10px);border-radius:16px;padding:12px 18px;box-shadow:0 2px 16px rgba(0,0,0,0.1);border:1px solid rgba(0,0,0,0.06)}
 .map-empty-icon{font-size:32px;margin-bottom:6px}
 .map-empty-text{font-size:13px;font-weight:600;color:var(--mid);line-height:1.4}
 
 /* Cat popup */
-#cat-popup{position:absolute;bottom:0;left:0;right:0;background:var(--light);border-radius:22px 22px 0 0;padding:6px 18px 24px;box-shadow:0 -4px 32px rgba(0,0,0,0.15);z-index:10;transform:translateY(100%);transition:transform .3s cubic-bezier(.34,1.1,.64,1)}
+#cat-popup{position:absolute;bottom:0;left:0;right:0;background:var(--light);border-radius:22px 22px 0 0;padding:6px 18px 24px;box-shadow:0 -4px 32px rgba(0,0,0,0.15);z-index:10;transform:translateY(100%);transition:transform .3s cubic-bezier(.34,1.1,.64,1);pointer-events:auto}
 #cat-popup.open{transform:translateY(0)}
 .popup-handle{width:36px;height:4px;background:#ddd;border-radius:2px;margin:8px auto 14px}
 .popup-row{display:flex;align-items:flex-start;gap:12px}
@@ -250,9 +248,9 @@ input:focus,textarea:focus{outline:none}
 
   <div id="tabs">
     <!-- MAP -->
-    <div id="tab-map" class="tab-panel active" style="position:relative">
+    <div id="tab-map" class="tab-panel active">
+      <div id="maplibre"></div>
       <div id="map">
-        <div id="maplibre"></div>
         <div id="cod-banner">
           <span class="cod-star">⭐</span>
           <div>
@@ -686,6 +684,7 @@ function initMap(){
 
   mapInstance.on("load", async ()=>{
     clearTimeout(loadTimeout);
+    mapInstance.resize();
     await loadCats();
     renderMapCats();
     updateCatOfDay();
