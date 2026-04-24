@@ -44,15 +44,19 @@ input:focus,textarea:focus{outline:none}
 #lang-btn:hover{background:var(--terra);color:#fff}
 
 /* TABS */
-#tabs{display:flex;flex:1;overflow:hidden;position:relative;height:calc(100dvh - var(--header) - var(--nav))}
+#tabs{flex:1;position:relative;overflow:hidden;min-height:0}
 .tab-panel{position:absolute;inset:0;overflow-y:auto;overflow-x:hidden;display:none;padding-bottom:calc(var(--nav) + 16px)}
 .tab-panel.active{display:block}
-#tab-map{padding:0;display:none;height:calc(100dvh - var(--header) - var(--nav))}
-#tab-map.active{display:flex;flex-direction:column;height:calc(100dvh - var(--header) - var(--nav))}
+#tab-map{padding:0;display:none}
+#tab-map.active{display:flex;flex-direction:column;position:absolute;inset:0;overflow:hidden}
 
 /* MAP */
-#map{flex:1;position:relative;overflow:hidden;min-height:200px}
-#maplibre{width:100%;height:100%;min-height:200px}
+#map{flex:1;position:relative;overflow:hidden}
+#maplibre{position:absolute;top:0;left:0;right:0;bottom:0}
+.maplibregl-map{width:100%!important;height:100%!important}
+.maplibregl-control-container .maplibregl-ctrl-top-right{top:12px;right:12px}
+.maplibregl-ctrl-zoom-in,.maplibregl-ctrl-zoom-out{border:none!important}
+.maplibregl-ctrl-group{border-radius:10px!important;box-shadow:0 2px 8px rgba(0,0,0,0.15)!important}
 .cat-pin{width:38px;height:38px;border-radius:50%;border:2.5px solid #fff;display:flex;align-items:center;justify-content:center;font-size:18px;cursor:pointer;box-shadow:0 3px 10px rgba(0,0,0,0.22);transition:transform .2s cubic-bezier(.34,1.56,.64,1);background:#fff;position:relative}
 .cat-pin:hover{transform:scale(1.15)}
 .cat-pin.selected{transform:scale(1.25)}
@@ -669,43 +673,36 @@ function initMap(){
   mapInstance = new maplibregl.Map({
     container:"maplibre",
     style:"https://tiles.openfreemap.org/styles/liberty",
-    center:[userLng,userLat],
+    center:[userLng, userLat],
     zoom:14,
     attributionControl:false,
-    fadeDuration:0,        // Supprime le fade des tuiles — plus rapide visuellement
+    fadeDuration:150,
   });
-  mapInstance.addControl(new maplibregl.NavigationControl({showCompass:false}),"top-right");
 
-  // Timeout de sécurité — si la carte met trop de temps, on cache le loading quand même
-  const loadTimeout = setTimeout(()=>{
-    $("loading")?.classList.add("hide");
-    setTimeout(()=>$("loading")?.remove(),600);
-  }, 6000);
+  mapInstance.addControl(new maplibregl.NavigationControl({showCompass:false}), "top-right");
+
+  // Timeout sécurité 8s
+  const loadTimeout = setTimeout(()=>hideLoading(), 8000);
 
   mapInstance.on("load", async ()=>{
     clearTimeout(loadTimeout);
-    mapInstance.resize(); // Force recalcul de la taille
     await loadCats();
     renderMapCats();
     updateCatOfDay();
-    $("loading")?.classList.add("hide");
-    setTimeout(()=>$("loading")?.remove(),500);
+    hideLoading();
   });
 
-  // Dès que le style est prêt (avant les tuiles) — masquer le loading partiel
-  mapInstance.on("style.load", ()=>{
-    const sub = $("loading-sub");
-    if(sub) sub.textContent = lang==="fr" ? "Chargement de la carte..." : "Loading map...";
-  });
+  mapInstance.on("click", ()=>{ if(selectedCat) closePopup(); });
+}
 
-  mapInstance.on("click",()=>{ if(selectedCat) closePopup(); });
+function hideLoading(){
+  const el=$("loading");
+  if(el){el.classList.add("hide");setTimeout(()=>el.remove(),500);}
 }
 
 function renderMapCats(){
-  // Supprimer anciens marqueurs
   Object.values(markers).forEach(({marker})=>marker.remove());
-  markers = {};
-  // Afficher état vide si aucun chat
+  markers={};
   if(cats.length===0){
     $("map-empty").classList.add("visible");
   } else {
@@ -715,39 +712,40 @@ function renderMapCats(){
 }
 
 function addCatMarker(cat){
-  const colors = ["#D4572A","#C9853A","#7B9EA6","#B85C38","#8B6CA6","#C0392B"];
-  const color = cat.color || colors[Math.abs(cat.name?.charCodeAt(0)||0) % colors.length];
-  const el = document.createElement("button");
-  el.className = "cat-pin"+(cat.legend?" legend":"");
-  el.innerHTML = cat.emoji||"🐱";
-  el.style.background = "#fff";
-  el.style.borderColor = color;
-  el.style.color = color;
+  const colors=["#D4572A","#C9853A","#7B9EA6","#B85C38","#8B6CA6","#C0392B"];
+  const color=cat.color||colors[Math.abs(cat.name?.charCodeAt(0)||0)%colors.length];
+  const el=document.createElement("button");
+  el.className="cat-pin"+(cat.legend?" legend":"");
+  el.innerHTML=cat.emoji||"🐱";
+  el.style.cssText=`background:#fff;border-color:${color};color:${color}`;
   el.addEventListener("click", e=>{e.stopPropagation(); openPopup({...cat,color});});
-  const marker = new maplibregl.Marker({element:el,anchor:"center"})
-    .setLngLat([cat.lng,cat.lat]).addTo(mapInstance);
-  markers[cat.id] = {marker,el,color};
+  // MapLibre : coordonnées en [lng, lat]
+  const marker=new maplibregl.Marker({element:el,anchor:"center"})
+    .setLngLat([cat.lng, cat.lat])
+    .addTo(mapInstance);
+  markers[cat.id]={marker,el,color};
 }
 
 function updateCatOfDay(){
-  if(!cats.length){ $("cod-banner").classList.remove("visible"); return; }
-  const best = cats.reduce((a,b)=>((b.likes_count||0)>(a.likes_count||0)?b:a),cats[0]);
-  if((best.likes_count||0)===0){ $("cod-banner").classList.remove("visible"); return; }
-  $("cod-label").textContent = t().codLabel;
-  $("cod-name").textContent = best.name||"Inconnu";
-  $("cod-likes").textContent = (best.likes_count||0)+" "+t().likes;
+  if(!cats.length){$("cod-banner").classList.remove("visible");return;}
+  const best=cats.reduce((a,b)=>((b.likes_count||0)>(a.likes_count||0)?b:a),cats[0]);
+  if((best.likes_count||0)===0){$("cod-banner").classList.remove("visible");return;}
+  $("cod-label").textContent=t().codLabel;
+  $("cod-name").textContent=best.name||"Inconnu";
+  $("cod-likes").textContent=(best.likes_count||0)+" "+t().likes;
   $("cod-banner").classList.add("visible");
 }
 
 function openPopup(cat){
-  selectedCat = cat;
+  selectedCat=cat;
+  // Highlight marqueur
   Object.values(markers).forEach(({el,color})=>{
-    el.style.background="#fff";el.style.transform="scale(1)";
+    el.style.background="#fff"; el.style.transform="scale(1)"; el.style.color=color;
   });
   if(markers[cat.id]){
-    markers[cat.id].el.style.background = cat.color;
-    markers[cat.id].el.style.color = "#fff";
-    markers[cat.id].el.style.transform = "scale(1.25)";
+    markers[cat.id].el.style.background=cat.color;
+    markers[cat.id].el.style.color="#fff";
+    markers[cat.id].el.style.transform="scale(1.25)";
   }
   const box=$("popup-emoji-box");
   box.textContent=cat.emoji||"🐱";
@@ -757,14 +755,14 @@ function openPopup(cat){
   $("popup-meta").textContent=t().sightings(cat.sightings||1)+" · "+fmtAgo(cat.created_at||new Date().toISOString());
   $("popup-desc").textContent=cat.desc||"";
   $("popup-desc").style.display=cat.desc?"block":"none";
-  const tagsEl=$("popup-tags");
-  tagsEl.innerHTML="";
+  const tagsEl=$("popup-tags"); tagsEl.innerHTML="";
   const charMap={friendly:t().friendly,wild:t().wild,shy:t().shy,playful:t().playful};
   if(cat.char) tagsEl.innerHTML+="<span class='popup-tag'>"+charMap[cat.char]+"</span>";
   if(cat.legend) tagsEl.innerHTML+="<span class='popup-tag legend'>⭐ "+t().legend+"</span>";
   updatePopupLike(cat);
   $("cat-popup").classList.add("open");
-  mapInstance.flyTo({center:[cat.lng,cat.lat],offset:[0,80],duration:400});
+  // MapLibre : flyTo avec [lng, lat]
+  mapInstance.flyTo({center:[cat.lng, cat.lat], offset:[0,80], duration:400});
 }
 
 function updatePopupLike(cat){
@@ -777,8 +775,8 @@ function closePopup(){
   selectedCat=null;
   $("cat-popup").classList.remove("open");
   Object.values(markers).forEach(({el,color})=>{
-    el.style.background="#fff";el.style.transform="scale(1)";
-    if(color){el.style.color=color;el.style.borderColor=color;}
+    el.style.background="#fff"; el.style.transform="scale(1)";
+    if(color){el.style.color=color; el.style.borderColor=color;}
   });
 }
 
@@ -931,7 +929,7 @@ async function publishSpot(){
     addCatMarker(cat);
     $("map-empty").classList.remove("visible");
     updateCatOfDay();
-    mapInstance.flyTo({center:[newLng,newLat],zoom:16,duration:800});
+    mapInstance.flyTo({center:[newLng, newLat], zoom:16, duration:800});
   }
   if(currentTab==="feed") renderFeed();
   if(currentTab==="profile") renderProfile();
@@ -1048,7 +1046,7 @@ const setProgress = (pct, msg) => {
 if(navigator.geolocation){
   navigator.geolocation.getCurrentPosition(p=>{
     userLat=p.coords.latitude; userLng=p.coords.longitude;
-    if(mapInstance) mapInstance.setCenter([userLng,userLat]);
+    if(mapInstance) mapInstance.setCenter([userLng, userLat]);
   }, ()=>{}, {timeout:4000, maximumAge:60000});
 }
 
