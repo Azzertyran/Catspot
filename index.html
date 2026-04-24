@@ -692,6 +692,8 @@ async function loadUserProfile(){
     renderProfile();
   } catch(e){ console.warn("loadUserProfile:", e); }
 }
+
+async function loadUserLikes(){
   if(!currentUser) return;
   try {
     const {data} = await sb.from("likes").select("cat_id").eq("user_id",currentUser.id);
