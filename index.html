@@ -229,7 +229,10 @@ input:focus,textarea:focus{outline:none}
 <div id="loading">
   <span class="loading-paw">🐾</span>
   <div class="loading-name serif">Cat<span>spot</span></div>
-  <div class="loading-sub" id="loading-sub">Chargement...</div>
+  <div class="loading-sub" id="loading-sub">Localisation en cours...</div>
+  <div id="loading-bar" style="width:200px;height:3px;background:rgba(255,255,255,.15);border-radius:2px;margin-top:20px;overflow:hidden">
+    <div id="loading-progress" style="height:100%;background:var(--terra);border-radius:2px;width:0%;transition:width .4s ease"></div>
+  </div>
 </div>
 
 <div id="app">
@@ -629,33 +632,72 @@ async function toggleLikeDB(catId){
 async function uploadPhoto(file, catId){
   if(!file||!currentUser) return null;
   try {
-    const ext = file.name.split(".").pop();
-    const path = catId+"/"+Date.now()+"."+ext;
-    const {error} = await sb.storage.from("cat-photos").upload(path,file);
+    const compressed = await compressImage(file);
+    const path = catId+"/"+Date.now()+".jpg";
+    const {error} = await sb.storage.from("cat-photos").upload(path, compressed, {contentType:"image/jpeg"});
     if(error) throw error;
     const {data} = sb.storage.from("cat-photos").getPublicUrl(path);
     return data.publicUrl;
   } catch(e){return null;}
 }
 
+// Compression canvas — max 1200px, qualité 0.82
+// Réduit une photo iPhone de 8Mo à ~200-400Ko
+function compressImage(file, maxPx=1200, quality=0.82){
+  return new Promise(resolve => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      let {width:w, height:h} = img;
+      if(w>maxPx||h>maxPx){
+        if(w>h){h=Math.round(h*maxPx/w);w=maxPx;}
+        else{w=Math.round(w*maxPx/h);h=maxPx;}
+      }
+      const canvas=document.createElement("canvas");
+      canvas.width=w; canvas.height=h;
+      canvas.getContext("2d").drawImage(img,0,0,w,h);
+      canvas.toBlob(blob=>resolve(blob||file),"image/jpeg",quality);
+    };
+    img.onerror=()=>resolve(file);
+    img.src=url;
+  });
+}
+
 // ── MAP ───────────────────────────────────────────────────────
 function initMap(){
-  // Centrer sur position user si dispo
   mapInstance = new maplibregl.Map({
     container:"maplibre",
     style:"https://tiles.openfreemap.org/styles/liberty",
     center:[userLng,userLat],
     zoom:14,
-    attributionControl:false
+    attributionControl:false,
+    fadeDuration:0,        // Supprime le fade des tuiles — plus rapide visuellement
   });
   mapInstance.addControl(new maplibregl.NavigationControl({showCompass:false}),"top-right");
+
+  // Timeout de sécurité — si la carte met trop de temps, on cache le loading quand même
+  const loadTimeout = setTimeout(()=>{
+    $("loading")?.classList.add("hide");
+    setTimeout(()=>$("loading")?.remove(),600);
+  }, 6000);
+
   mapInstance.on("load", async ()=>{
+    clearTimeout(loadTimeout);
+    // Charger les chats et masquer le loading en parallèle
     await loadCats();
     renderMapCats();
     updateCatOfDay();
-    $("loading").classList.add("hide");
-    setTimeout(()=>$("loading").remove(),600);
+    $("loading")?.classList.add("hide");
+    setTimeout(()=>$("loading")?.remove(),500);
   });
+
+  // Dès que le style est prêt (avant les tuiles) — masquer le loading partiel
+  mapInstance.on("style.load", ()=>{
+    const sub = $("loading-sub");
+    if(sub) sub.textContent = lang==="fr" ? "Chargement de la carte..." : "Loading map...";
+  });
+
   mapInstance.on("click",()=>{ if(selectedCat) closePopup(); });
 }
 
@@ -996,17 +1038,26 @@ if("serviceWorker" in navigator) {
 setTimeout(showIOSBanner, 3000);
 
 // ── INIT ──────────────────────────────────────────────────────
+const setProgress = (pct, msg) => {
+  const bar = $("loading-progress"); const sub = $("loading-sub");
+  if(bar) bar.style.width = pct+"%";
+  if(sub) sub.textContent = msg;
+};
+
+// Géoloc en parallèle du reste
 if(navigator.geolocation){
   navigator.geolocation.getCurrentPosition(p=>{
-    userLat=p.coords.latitude;userLng=p.coords.longitude;
+    userLat=p.coords.latitude; userLng=p.coords.longitude;
     if(mapInstance) mapInstance.setCenter([userLng,userLat]);
-  },()=>{});
+  }, ()=>{}, {timeout:4000, maximumAge:60000});
 }
 
 (async()=>{
-  $("loading-sub").textContent=t().loading;
+  setProgress(20, lang==="fr"?"Connexion...":"Connecting...");
   await initAuth();
+  setProgress(50, lang==="fr"?"Chargement de la carte...":"Loading map...");
   initMap();
+  setProgress(80, lang==="fr"?"Presque prêt...":"Almost ready...");
   renderChallenges();
   renderProfile();
 })();
