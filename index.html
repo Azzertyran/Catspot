@@ -10,6 +10,8 @@
 <meta name="apple-mobile-web-app-title" content="Catspot"/>
 <meta name="description" content="Géolocalisez les chats du monde 🐾"/>
 <link rel="manifest" href="manifest.json"/>
+<link rel="icon" href="/favicon.png" type="image/png"/>
+<link rel="apple-touch-icon" href="/apple-touch-icon.png"/>
 <title>Catspot 🐾</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"/>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,400;0,700;0,900;1,400&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,700&display=swap" rel="stylesheet"/>
@@ -381,6 +383,15 @@ input:focus,textarea:focus{outline:none}
           </div>
           <span class="support-arrow">→</span>
         </div>
+
+        <!-- Footer créateur -->
+        <div style="text-align:center;padding:8px 0 4px;border-top:1px solid #f0ece6;margin-top:4px">
+          <div style="font-size:12px;color:var(--muted)">Une app créée par</div>
+          <div style="font-size:14px;font-weight:700;color:var(--dark);margin-top:2px">Philippe Auger</div>
+          <a href="mailto:pilipog49@gmail.com" style="font-size:12px;color:var(--terra);text-decoration:none">pilipog49@gmail.com</a>
+          <div style="font-size:11px;color:#ccc;margin-top:6px">Catspot v1.0 🐾</div>
+        </div>
+
       </div>
     </div>
   </div>
@@ -426,6 +437,8 @@ input:focus,textarea:focus{outline:none}
 const SUPABASE_URL = "https://bctrrdscvgobmmjqnwks.supabase.co";
 const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJjdHJyZHNjdmdvYm1tanFud2tzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcwMzE5MzUsImV4cCI6MjA5MjYwNzkzNX0.1h1uLYSs-B7XfaX7sOOB8EVsiGrLZowXaq786CeIQGc";
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+const ADMIN_EMAIL = "pilipog49@gmail.com"; // Compte admin
+const isAdmin = () => currentUser?.email === ADMIN_EMAIL;
 
 // ── i18n ──────────────────────────────────────────────────────
 const T = {
@@ -622,15 +635,8 @@ async function signInWithGoogle(){
 
 async function signOut(){
   await sb.auth.signOut();
-  currentUser = null;
-  likes = {};
-  challenges = CHALLENGES_DEF.map(c=>({...c, done:false}));
-  userProfile = {totalCats:0, streak:0, totalLikes:0};
-  $("profile-avatar").innerHTML = "🐱";
-  $("profile-name").textContent = "CatSpotter";
-  updateAuthUI();
-  if(currentTab==="challenges") renderChallenges();
-  showToast("👋 "+(lang==="fr"?"Déconnecté":"Signed out"));
+  // Recharger proprement — évite les bugs de session résiduelle
+  window.location.href = window.location.pathname;
 }
 
 function updateAuthUI(){
@@ -680,20 +686,30 @@ async function loadCats(){
 }
 
 async function loadUserProfile(){
-  if(!currentUser || currentUser.is_anonymous) return;
+  if(!currentUser||currentUser.is_anonymous) return;
   try {
-    // Nombre de chats postés par cet user
-    const {count:catsCount} = await sb.from("cats")
-      .select("*", {count:"exact", head:true})
-      .eq("posted_by", currentUser.user_metadata?.full_name || currentUser.email?.split("@")[0] || "");
-    // Nombre de likes reçus
-    const {count:likesCount} = await sb.from("likes")
-      .select("*", {count:"exact", head:true})
-      .eq("user_id", currentUser.id);
-    userProfile.totalCats = catsCount || 0;
-    userProfile.totalLikes = likesCount || 0;
+    const name = currentUser.user_metadata?.full_name || currentUser.email?.split("@")[0] || "";
+    // Chats postés
+    const {count:catsCount} = await sb.from("cats").select("*",{count:"exact",head:true}).eq("posted_by",name);
+    // Likes reçus sur ses chats
+    const {data:myCats} = await sb.from("cats").select("id,likes_count").eq("posted_by",name);
+    const totalLikes = (myCats||[]).reduce((a,c)=>a+(c.likes_count||0),0);
+    // Streak — jours consécutifs avec un chat posté
+    const {data:mySpots} = await sb.from("cats").select("created_at").eq("posted_by",name).order("created_at",{ascending:false});
+    let streak = 0;
+    if(mySpots?.length){
+      const today = new Date(); today.setHours(0,0,0,0);
+      let checkDay = new Date(today);
+      for(let i=0;i<30;i++){
+        const dayStr = checkDay.toISOString().split("T")[0];
+        const hasSpot = mySpots.some(s=>s.created_at.startsWith(dayStr));
+        if(hasSpot){ streak++; checkDay.setDate(checkDay.getDate()-1); }
+        else break;
+      }
+    }
+    userProfile = {totalCats:catsCount||0, totalLikes, streak};
     renderProfile();
-  } catch(e){ console.warn("loadUserProfile:", e); }
+  } catch(e){ console.warn("loadUserProfile:",e); }
 }
 
 async function loadUserLikes(){
@@ -786,6 +802,7 @@ function initMap(){
     mapInstance.resize();
     renderMapCats();
     updateCatOfDay();
+    addDynamicHotspots();
   });
 
   mapInstance.on("click", ()=>{ if(selectedCat) closePopup(); });
@@ -836,6 +853,41 @@ function updateCatOfDay(){
   $("cod-banner").classList.add("visible");
 }
 
+function addDynamicHotspots(){
+  if(!cats.length||!mapInstance.isStyleLoaded()) return;
+  // Nettoyer anciens layers
+  for(let i=0;i<5;i++){
+    if(mapInstance.getLayer("hs-"+i)) mapInstance.removeLayer("hs-"+i);
+    if(mapInstance.getSource("hs-"+i)) mapInstance.removeSource("hs-"+i);
+  }
+  // Regrouper par proximité ~300m
+  const clusters=[], used=new Set();
+  cats.forEach((cat,i)=>{
+    if(used.has(i)) return;
+    const cluster={cats:[cat],lat:cat.lat,lng:cat.lng};
+    cats.forEach((o,j)=>{
+      if(i===j||used.has(j)) return;
+      const d=Math.sqrt(Math.pow(cat.lat-o.lat,2)+Math.pow(cat.lng-o.lng,2));
+      if(d<0.003){cluster.cats.push(o);used.add(j);}
+    });
+    used.add(i);
+    clusters.push(cluster);
+  });
+  clusters.sort((a,b)=>b.cats.length-a.cats.length);
+  clusters.slice(0,5).forEach((cl,i)=>{
+    const n=cl.cats.length;
+    const alpha=Math.min(n/8,1)*0.28;
+    const col=n>=5?`rgba(212,87,42,${alpha})`:n>=3?`rgba(201,133,58,${alpha})`:`rgba(123,158,166,${alpha})`;
+    try {
+      mapInstance.addSource("hs-"+i,{type:"geojson",data:{type:"Feature",geometry:{type:"Point",coordinates:[cl.lng,cl.lat]}}});
+      mapInstance.addLayer({id:"hs-"+i,type:"circle",source:"hs-"+i,paint:{
+        "circle-radius":["interpolate",["linear"],["zoom"],12,n*10,16,n*35],
+        "circle-color":col,"circle-blur":1,
+      }});
+    } catch(e){}
+  });
+}
+
 function openPopup(cat){
   selectedCat=cat;
   // Highlight marqueur
@@ -865,6 +917,17 @@ function openPopup(cat){
   const poster = cat.posted_by || (lang==="fr"?"Anonyme":"Anonymous");
   $("popup-name").textContent=cat.name||"Chat inconnu";
   $("popup-meta").textContent="Par "+poster+" · "+t().sightings(cat.sightings||1)+" · "+fmtAgo(cat.created_at||new Date().toISOString());
+  // Bouton admin delete
+  const existingAdminBtn = $("popup-admin-btn");
+  if(existingAdminBtn) existingAdminBtn.remove();
+  if(isAdmin()){
+    const btn = document.createElement("button");
+    btn.id = "popup-admin-btn";
+    btn.style.cssText = "background:#fee2e2;border:none;border-radius:8px;padding:6px 12px;font-size:12px;font-weight:700;color:#dc2626;cursor:pointer;margin-top:10px;font-family:'DM Sans',sans-serif;width:100%";
+    btn.textContent = "🗑️ "+(lang==="fr"?"Supprimer ce chat":"Delete this cat");
+    btn.onclick = ()=>deleteCat(cat.id);
+    $("popup-inner").appendChild(btn);
+  }
   $("popup-desc").textContent=cat.desc||"";
   $("popup-desc").style.display=cat.desc?"block":"none";
   const tagsEl=$("popup-tags"); tagsEl.innerHTML="";
@@ -906,7 +969,58 @@ function closePopup(){
   });
 }
 
-// ── FEED ──────────────────────────────────────────────────────
+// ── ADMIN ─────────────────────────────────────────────────────
+async function deleteCat(id){
+  if(!isAdmin()) return;
+  if(!confirm(lang==="fr"?"Supprimer ce chat ?":"Delete this cat?")) return;
+  try {
+    await sb.from("cats").delete().eq("id", id);
+    cats = cats.filter(c=>c.id!==id);
+    if(markers[id]){ markers[id].marker.remove(); delete markers[id]; }
+    if(selectedCat?.id===id) closePopup();
+    renderFeed();
+    showToast("🗑️ "+(lang==="fr"?"Chat supprimé":"Cat deleted"));
+  } catch(e){ showToast("❌ Erreur"); }
+}
+window.deleteCat = deleteCat;
+
+// ── PROFIL UTILISATEUR ────────────────────────────────────────
+function showUserProfile(poster){
+  if(!poster || poster===(lang==="fr"?"Anonyme":"Anonymous")) return;
+  const userCats = cats.filter(c=>c.posted_by===poster);
+  const modal = document.createElement("div");
+  modal.id = "user-profile-modal";
+  modal.style.cssText = "position:fixed;inset:0;background:rgba(28,25,21,.65);z-index:200;display:flex;align-items:flex-end;backdrop-filter:blur(4px)";
+  const colors=["#D4572A","#C9853A","#7B9EA6","#B85C38","#8B6CA6","#C0392B"];
+  const cards = userCats.map(cat=>{
+    const color=cat.color||colors[0];
+    const photoHtml=cat.photo_url
+      ?`<img src="${cat.photo_url}" style="width:100%;height:160px;object-fit:contain;background:#111;display:block;border-radius:12px">`
+      :`<div style="height:100px;background:linear-gradient(135deg,${color}22,${color}44);border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:48px">${cat.emoji||"🐱"}</div>`;
+    return `<div style="background:#fff;border-radius:14px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.08)">
+      ${photoHtml}
+      <div style="padding:10px 12px">
+        <div style="font-family:'Fraunces',serif;font-size:15px;font-weight:700">${cat.name||"Chat inconnu"}</div>
+        <div style="font-size:11px;color:var(--muted);margin-top:2px">${fmtAgo(cat.created_at||new Date().toISOString())}</div>
+      </div>
+    </div>`;
+  }).join("");
+  modal.innerHTML = `<div style="background:var(--light);border-radius:22px 22px 0 0;width:100%;max-height:85vh;overflow-y:auto;padding:8px 18px 32px">
+    <div style="width:36px;height:4px;background:#ddd;border-radius:2px;margin:10px auto 16px"></div>
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px">
+      <div style="width:52px;height:52px;border-radius:50%;background:linear-gradient(135deg,var(--terra),var(--amber));display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:700;color:#fff">${poster.charAt(0).toUpperCase()}</div>
+      <div>
+        <div style="font-family:'Fraunces',serif;font-size:18px;font-weight:700">${poster}</div>
+        <div style="font-size:12px;color:var(--muted)">${userCats.length} chat${userCats.length>1?"s":""} spotté${userCats.length>1?"s":""}</div>
+      </div>
+      <button onclick="document.getElementById('user-profile-modal').remove()" style="margin-left:auto;background:var(--warm);border:none;border-radius:50%;width:32px;height:32px;font-size:16px;cursor:pointer">×</button>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">${cards||`<div style="color:var(--muted);font-size:13px;grid-column:1/-1;text-align:center;padding:20px">Aucun chat posté</div>`}</div>
+  </div>`;
+  modal.addEventListener("click", e=>{ if(e.target===modal) modal.remove(); });
+  document.body.appendChild(modal);
+}
+window.showUserProfile = showUserProfile;
 let feedPage = 0;
 const FEED_PAGE_SIZE = 20;
 
@@ -932,14 +1046,15 @@ function renderFeed(append=false){
         `<span class='feed-photo-emoji' style="display:none">${cat.emoji||"🐱"}</span>`
       :`<span class='feed-photo-emoji'>${cat.emoji||"🐱"}</span>`;
     const poster = cat.posted_by || (lang==="fr"?"Anonyme":"Anonymous");
+    const adminBtn = isAdmin() ? `<button onclick="deleteCat('${cat.id}')" style="margin-left:auto;background:#fee2e2;border:none;border-radius:8px;padding:4px 10px;font-size:11px;font-weight:700;color:#dc2626;cursor:pointer;font-family:'DM Sans',sans-serif">🗑️</button>` : '<span class="feed-pin">📍</span>';
     return `<div class='feed-card'>
       <div class='feed-head'>
         <div class='feed-avatar' style='background:${color}22;border-color:${color}'>${cat.emoji||"🐱"}</div>
         <div>
           <div class='feed-catname serif'>${cat.name||"Chat inconnu"}</div>
-          <div class='feed-meta'>Par <strong>${poster}</strong> · ${fmtAgo(cat.created_at||new Date().toISOString())} · ${t().sightings(cat.sightings||1)}</div>
+          <div class='feed-meta'>Par <strong style="cursor:pointer;text-decoration:underline;color:var(--terra)" onclick="showUserProfile('${poster}')">${poster}</strong> · ${fmtAgo(cat.created_at||new Date().toISOString())} · ${t().sightings(cat.sightings||1)}</div>
         </div>
-        <span class='feed-pin'>📍</span>
+        ${adminBtn}
       </div>
       <div class='feed-photo' style='background:linear-gradient(135deg,${color}18,${color}42)'>${photoHtml}<div class='feed-photo-loc'>📍 Catspot</div></div>
       ${cat.desc?`<p class='feed-desc'>"${cat.desc}"</p>`:""}
