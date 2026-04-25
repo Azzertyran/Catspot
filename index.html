@@ -76,7 +76,7 @@ input:focus,textarea:focus{outline:none}
 .map-empty-text{font-size:13px;font-weight:600;color:var(--mid);line-height:1.4}
 
 /* Cat popup */
-#cat-popup{position:absolute;bottom:0;left:0;right:0;background:var(--light);border-radius:22px 22px 0 0;box-shadow:0 -4px 32px rgba(0,0,0,0.15);z-index:10;transform:translateY(100%);transition:transform .3s cubic-bezier(.34,1.1,.64,1);pointer-events:auto;max-height:90vh;overflow-y:auto}
+#cat-popup{position:absolute;bottom:0;left:0;right:0;background:var(--light);border-radius:22px 22px 0 0;box-shadow:0 -4px 32px rgba(0,0,0,0.15);z-index:10;transform:translateY(100%);transition:transform .3s cubic-bezier(.34,1.1,.64,1);pointer-events:auto;max-height:90vh;overflow-y:auto;padding-bottom:calc(var(--nav) + 70px)}
 #cat-popup.open{transform:translateY(0)}
 #cat-popup.expanded{transform:translateY(0)}
 .popup-handle{width:36px;height:4px;background:#ddd;border-radius:2px;margin:8px auto 14px;cursor:grab;flex-shrink:0}
@@ -297,7 +297,8 @@ input:focus,textarea:focus{outline:none}
             <!-- Actions -->
             <div style="display:flex;gap:8px;margin-top:12px">
               <button id="popup-respott-btn" style="flex:1;background:var(--terra);color:#fff;border:none;border-radius:12px;padding:10px;font-size:13px;font-weight:700;cursor:pointer;font-family:'DM Sans',sans-serif">🐾 Je l'ai vu !</button>
-              <button id="popup-report-btn" style="background:var(--warm);color:var(--mid);border:none;border-radius:12px;padding:10px 14px;font-size:13px;cursor:pointer;font-family:'DM Sans',sans-serif">🚩</button>
+              <button id="popup-comment-btn" style="flex:1;background:var(--warm);color:var(--dark);border:none;border-radius:12px;padding:10px;font-size:13px;font-weight:700;cursor:pointer;font-family:'DM Sans',sans-serif">💬</button>
+              <button id="popup-report-btn" style="background:#fee2e2;color:#dc2626;border:none;border-radius:12px;padding:10px 14px;font-size:13px;cursor:pointer;font-family:'DM Sans',sans-serif">🚩</button>
             </div>
           </div>
         </div>
@@ -418,10 +419,16 @@ input:focus,textarea:focus{outline:none}
   <div id="modal">
     <div class="modal-handle"></div>
     <div class="modal-title serif" id="modal-title">Nouveau spot 🐾</div>
-    <div class="photo-zone" id="photo-zone" onclick="document.getElementById('photo-input').click()">
+    <div class="photo-zone" id="photo-zone">
       <span class="photo-zone-icon">📸</span>
       <span class="photo-zone-tip" id="photo-tip">Appuie pour prendre une photo</span>
+      <div style="display:flex;gap:8px;margin-top:10px" id="photo-btns">
+        <button type="button" onclick="document.getElementById('photo-camera').click()" style="flex:1;background:var(--terra);color:#fff;border:none;border-radius:10px;padding:8px;font-size:12px;font-weight:700;cursor:pointer;font-family:'DM Sans',sans-serif">📷 Caméra</button>
+        <button type="button" onclick="document.getElementById('photo-gallery').click()" style="flex:1;background:var(--warm);color:var(--dark);border:none;border-radius:10px;padding:8px;font-size:12px;font-weight:700;cursor:pointer;font-family:'DM Sans',sans-serif">🖼️ Galerie</button>
+      </div>
     </div>
+    <input type="file" id="photo-camera" accept="image/*" capture="environment" style="display:none"/>
+    <input type="file" id="photo-gallery" accept="image/*" style="display:none"/>
     <input type="file" id="photo-input" accept="image/*" style="display:none"/>
     <div style="display:flex;align-items:center;gap:8px">
       <div class="loc-chip" style="flex:1">📍 <span id="loc-text">Position détectée</span></div>
@@ -882,7 +889,9 @@ function updateCatOfDay(){
   if((best.likes_count||0)===0){$("cod-banner").classList.remove("visible");return;}
   $("cod-label").textContent=t().codLabel;
   $("cod-name").textContent=best.name||"Inconnu";
-  $("cod-likes").textContent=(best.likes_count||0)+" "+t().likes;
+  // Compteur avec likes locaux inclus
+  const realLikes=(best.likes_count||0)+(likes[best.id]?1:0);
+  $("cod-likes").textContent=realLikes+" "+t().likes;
   $("cod-banner").classList.add("visible");
 }
 
@@ -1107,12 +1116,83 @@ window.reSpot = reSpot;
 function reportCat(catId){
   const cat=cats.find(c=>c.id===catId);
   if(!cat) return;
-  const subject=encodeURIComponent(`[Catspot] Signalement : ${cat.name||"Chat"} (${catId})`);
-  const body=encodeURIComponent(`Bonjour Philippe,\n\nSignalement d'un contenu :\n\nNom : ${cat.name||"Inconnu"}\nID : ${catId}\nPosté par : ${cat.posted_by||"Anonyme"}\n\nMotif : [à préciser]\n\nMerci.`);
-  window.open(`mailto:pilipog49@gmail.com?subject=${subject}&body=${body}`);
-  showToast("📧 "+(lang==="fr"?"Signalement envoyé !":"Report sent!"));
+  const existing=document.getElementById("report-modal");
+  if(existing) existing.remove();
+  const modal=document.createElement("div");
+  modal.id="report-modal";
+  modal.style.cssText="position:fixed;inset:0;background:rgba(28,25,21,.65);z-index:300;display:flex;align-items:center;justify-content:center;padding:20px;backdrop-filter:blur(4px)";
+  const reasons=lang==="fr"?["Contenu inapproprié","Photo choquante / nudité","Spam ou faux chat","Insultes / harcèlement","Autre"]:["Inappropriate content","Shocking photo / nudity","Spam or fake cat","Insults / harassment","Other"];
+  modal.innerHTML=`<div style="background:var(--light);border-radius:20px;padding:24px;width:100%;max-width:360px">
+    <div style="font-family:'Fraunces',serif;font-size:18px;font-weight:700;margin-bottom:6px">🚩 ${lang==="fr"?"Signaler":"Report"}</div>
+    <div style="font-size:13px;color:var(--muted);margin-bottom:16px">${cat.name||"Chat inconnu"}</div>
+    <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:16px">${reasons.map((r,i)=>`<label style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:#fff;border-radius:10px;cursor:pointer;border:1.5px solid #E8E2DA"><input type="radio" name="report-reason" value="${r}" ${i===0?"checked":""}> <span style="font-size:13px;font-weight:600">${r}</span></label>`).join("")}</div>
+    <div style="display:flex;gap:8px">
+      <button onclick="document.getElementById('report-modal').remove()" style="flex:1;padding:12px;border:1.5px solid #E8E2DA;border-radius:12px;background:#fff;font-size:14px;font-weight:700;color:var(--muted);cursor:pointer">${lang==="fr"?"Annuler":"Cancel"}</button>
+      <button onclick="submitReport('${catId}')" style="flex:1;padding:12px;border:none;border-radius:12px;background:#dc2626;font-size:14px;font-weight:700;color:#fff;cursor:pointer">${lang==="fr"?"Envoyer":"Send"}</button>
+    </div>
+  </div>`;
+  modal.addEventListener("click",e=>{if(e.target===modal)modal.remove();});
+  document.body.appendChild(modal);
 }
-window.reportCat = reportCat;
+window.reportCat=reportCat;
+
+async function submitReport(catId){
+  const reason=document.querySelector("input[name='report-reason']:checked")?.value||"Autre";
+  const cat=cats.find(c=>c.id===catId);
+  try { await sb.from("reports").insert([{cat_id:catId,reason,reporter:currentUser?.email||"Anonyme",cat_name:cat?.name||"Inconnu"}]); } catch(e){}
+  document.getElementById("report-modal")?.remove();
+  showToast("🚩 "+(lang==="fr"?"Signalement envoyé, merci !":"Report sent, thanks!"));
+}
+window.submitReport=submitReport;
+
+// ── COMMENTAIRES ──────────────────────────────────────────────
+async function showComments(catId){
+  const cat=cats.find(c=>c.id===catId);
+  if(!cat) return;
+  document.getElementById("comments-modal")?.remove();
+  let comments=[];
+  try { const {data}=await sb.from("comments").select("*").eq("cat_id",catId).order("created_at",{ascending:true}); comments=data||[]; } catch(e){}
+  const modal=document.createElement("div");
+  modal.id="comments-modal";
+  modal.style.cssText="position:fixed;inset:0;background:rgba(28,25,21,.65);z-index:300;display:flex;align-items:flex-end;backdrop-filter:blur(4px)";
+  const renderC=()=>comments.map(c=>`<div style="display:flex;gap:10px;margin-bottom:12px"><div style="width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,var(--terra),var(--amber));display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:#fff;flex-shrink:0">${(c.author||"?").charAt(0).toUpperCase()}</div><div style="flex:1;background:#f5f0e8;border-radius:0 12px 12px 12px;padding:8px 12px"><div style="font-size:12px;font-weight:700;color:var(--terra)">${c.author||"Anonyme"}</div><div style="font-size:13px;margin-top:2px">${c.text||""}</div><div style="font-size:10px;color:var(--muted);margin-top:4px">${fmtAgo(c.created_at)}</div></div></div>`).join("")||`<div style="text-align:center;padding:24px;color:var(--muted);font-size:13px">${lang==="fr"?"Sois le premier à commenter !":"Be the first to comment!"}</div>`;
+  modal.innerHTML=`<div style="background:var(--light);border-radius:22px 22px 0 0;width:100%;max-width:430px;margin:0 auto;max-height:80vh;display:flex;flex-direction:column">
+    <div style="padding:8px 18px 0;flex-shrink:0"><div style="width:36px;height:4px;background:#ddd;border-radius:2px;margin:10px auto 14px"></div>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+      <div style="font-family:'Fraunces',serif;font-size:17px;font-weight:700">💬 ${cat.name||"Chat inconnu"}</div>
+      <button onclick="document.getElementById('comments-modal').remove()" style="background:var(--warm);border:none;border-radius:50%;width:30px;height:30px;font-size:16px;cursor:pointer">×</button>
+    </div></div>
+    <div id="comments-list" style="flex:1;overflow-y:auto;padding:0 18px 12px">${renderC()}</div>
+    <div style="padding:12px 18px;border-top:1px solid #f0ece6;flex-shrink:0;display:flex;gap:8px">
+      <input id="comment-input" placeholder="${lang==="fr"?"Ajouter un commentaire...":"Add a comment..."}" style="flex:1;border:1.5px solid #E8E2DA;border-radius:20px;padding:10px 14px;font-size:13px;outline:none;font-family:'DM Sans',sans-serif"/>
+      <button onclick="postComment('${catId}')" style="background:var(--terra);border:none;border-radius:20px;padding:10px 16px;font-size:13px;font-weight:700;color:#fff;cursor:pointer">➤</button>
+    </div>
+  </div>`;
+  modal.addEventListener("click",e=>{if(e.target===modal)modal.remove();});
+  document.body.appendChild(modal);
+}
+window.showComments=showComments;
+
+async function postComment(catId){
+  const input=document.getElementById("comment-input");
+  const text=input?.value.trim();
+  if(!text) return;
+  if(containsBadWord(text)){ showToast("🚫 "+(lang==="fr"?"Commentaire inapproprié":"Inappropriate comment")); return; }
+  const author=currentUser?.user_metadata?.full_name||currentUser?.email?.split("@")[0]||(lang==="fr"?"Anonyme":"Anonymous");
+  try {
+    await sb.from("comments").insert([{cat_id:catId,text,author}]);
+    const list=document.getElementById("comments-list");
+    if(list){
+      const div=document.createElement("div");
+      div.style.cssText="display:flex;gap:10px;margin-bottom:12px";
+      div.innerHTML=`<div style="width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,var(--terra),var(--amber));display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:#fff;flex-shrink:0">${author.charAt(0).toUpperCase()}</div><div style="flex:1;background:#f5f0e8;border-radius:0 12px 12px 12px;padding:8px 12px"><div style="font-size:12px;font-weight:700;color:var(--terra)">${author}</div><div style="font-size:13px;margin-top:2px">${text}</div><div style="font-size:10px;color:var(--muted);margin-top:4px">${lang==="fr"?"À l'instant":"Just now"}</div></div>`;
+      if(list.querySelector("div[style*='text-align:center']")) list.innerHTML="";
+      list.appendChild(div); list.scrollTop=list.scrollHeight;
+    }
+    input.value="";
+  } catch(e){ showToast("❌ "+(lang==="fr"?"Erreur":"Error")); }
+}
+window.postComment=postComment;
 
 // ── FILTRAGE INSULTES ─────────────────────────────────────────
 const BAD_WORDS=["merde","putain","connard","connasse","salope","enculé","pute","bite","niquer","nique","baise","con","conne","fdp","ntm","pd","fuck","shit","bitch","asshole","bastard","cunt","dick","cock","pussy","whore","faggot","retard","kys"];
@@ -1352,6 +1432,9 @@ function openModal(){
   if(old) old.remove();
   $("photo-zone").querySelector(".photo-zone-icon").style.display="";
   $("photo-zone").querySelector(".photo-zone-tip").style.display="";
+  $("photo-btns").style.display="flex";
+  $("photo-camera").value="";
+  $("photo-gallery").value="";
   renderEmojiSelect();
   renderCharSelect();
   $("modal-title").textContent=t().newSpot;
@@ -1375,16 +1458,22 @@ function renderCharSelect(){
 function selectChar(c){selectedChar=c;renderCharSelect();}
 function closeModal(){$("modal-overlay").classList.remove("open");}
 
-$("photo-input").addEventListener("change",function(){
-  if(this.files&&this.files[0]){
-    const url=URL.createObjectURL(this.files[0]);
-    $("photo-zone").querySelector(".photo-zone-icon").style.display="none";
-    $("photo-zone").querySelector(".photo-zone-tip").style.display="none";
-    const old=$("photo-zone").querySelector(".photo-preview");if(old)old.remove();
-    const img=document.createElement("img");img.className="photo-preview";img.src=url;
-    $("photo-zone").appendChild(img);
-  }
-});
+function handlePhotoInput(file){
+  if(!file) return;
+  const url=URL.createObjectURL(file);
+  $("photo-zone").querySelector(".photo-zone-icon").style.display="none";
+  $("photo-zone").querySelector(".photo-zone-tip").style.display="none";
+  $("photo-btns").style.display="none";
+  const old=$("photo-zone").querySelector(".photo-preview");if(old)old.remove();
+  const img=document.createElement("img");img.className="photo-preview";img.src=url;
+  $("photo-zone").appendChild(img);
+  // Stocker dans photo-input pour publishSpot
+  const dt=new DataTransfer();dt.items.add(file);
+  $("photo-input").files=dt.files;
+}
+
+$("photo-camera").addEventListener("change",function(){ handlePhotoInput(this.files[0]); });
+$("photo-gallery").addEventListener("change",function(){ handlePhotoInput(this.files[0]); });
 
 async function publishSpot(){
   const name=$("input-name").value.trim()||"Chat inconnu";
@@ -1645,6 +1734,7 @@ $("popup-like-btn").addEventListener("click",async ()=>{
   await toggleLikeDB(id, wasLiked);
 });
 $("popup-respott-btn").addEventListener("click",()=>{ if(selectedCat) reSpot(selectedCat.id); });
+$("popup-comment-btn").addEventListener("click",()=>{ if(selectedCat) showComments(selectedCat.id); });
 $("popup-report-btn").addEventListener("click",()=>{ if(selectedCat) reportCat(selectedCat.id); });
 document.querySelectorAll(".nav-btn").forEach(b=>b.addEventListener("click",()=>switchTab(b.dataset.tab)));
 $("pro-btn").addEventListener("click",()=>showToast("🚀 Bientôt disponible !"));
