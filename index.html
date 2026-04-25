@@ -38,8 +38,6 @@ input:focus,textarea:focus{outline:none}
 /* HEADER */
 #header{display:flex;align-items:center;justify-content:space-between;padding:12px 18px 10px;background:var(--light);border-bottom:1px solid rgba(0,0,0,0.07);z-index:20;height:var(--header);flex-shrink:0}
 .logo-wrap{display:flex;align-items:center;gap:8px}
-.logo-paw{font-size:24px;animation:wiggle 3s ease-in-out infinite}
-@keyframes wiggle{0%,100%{transform:rotate(-6deg)}50%{transform:rotate(6deg)}}
 .app-name{font-family:"Fraunces",serif;font-size:26px;font-weight:900;letter-spacing:-1px;color:var(--dark)}
 .app-name span{color:var(--terra)}
 #lang-btn{background:var(--warm);border-radius:20px;padding:5px 12px;font-size:12px;font-weight:700;color:var(--mid);border:1px solid rgba(0,0,0,0.08);transition:all .2s}
@@ -231,9 +229,7 @@ input:focus,textarea:focus{outline:none}
 /* LOADING */
 #loading{position:fixed;inset:0;background:var(--dark);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:999;transition:opacity .5s}
 #loading.hide{opacity:0;pointer-events:none}
-.loading-paw{font-size:52px;animation:bounce 1s ease-in-out infinite}
-@keyframes bounce{0%,100%{transform:translateY(0)}50%{transform:translateY(-12px)}}
-.loading-name{font-family:"Fraunces",serif;font-size:32px;font-weight:900;color:#fff;margin-top:16px;letter-spacing:-1px}
+.loading-name{font-family:"Fraunces",serif;font-size:32px;font-weight:900;color:#fff;letter-spacing:-1px}
 .loading-name span{color:var(--terra)}
 .loading-sub{font-size:13px;color:rgba(255,255,255,.45);margin-top:8px}
 </style>
@@ -241,8 +237,8 @@ input:focus,textarea:focus{outline:none}
 <body>
 
 <div id="loading">
-  <span class="loading-paw">🐾</span>
-  <div class="loading-name serif">Cat<span>spot</span></div>
+  <img src="/icon-192.png" alt="Catspot" style="width:80px;height:80px;border-radius:20px;box-shadow:0 8px 32px rgba(0,0,0,0.3)"/>
+  <div class="loading-name serif" style="margin-top:16px">Cat<span>spot</span></div>
   <div class="loading-sub" id="loading-sub">Localisation en cours...</div>
   <div id="loading-bar" style="width:200px;height:3px;background:rgba(255,255,255,.15);border-radius:2px;margin-top:20px;overflow:hidden">
     <div id="loading-progress" style="height:100%;background:var(--terra);border-radius:2px;width:0%;transition:width .4s ease"></div>
@@ -252,7 +248,7 @@ input:focus,textarea:focus{outline:none}
 <div id="app">
   <header id="header">
     <div class="logo-wrap">
-      <span class="logo-paw">🐾</span>
+      <img src="/icon-192.png" alt="Catspot" style="width:32px;height:32px;border-radius:8px"/>
       <span class="app-name serif">Cat<span>spot</span></span>
     </div>
     <button id="lang-btn">EN 🌍</button>
@@ -589,6 +585,7 @@ async function initAuth(){
       currentUser = data.session.user;
       console.log("initAuth: connecté", currentUser.user_metadata?.full_name||currentUser.email);
       await Promise.all([loadUserLikes(), loadUserProfile()]);
+      await loadChallengesForUser();
     } else {
       console.log("initAuth: non connecté");
     }
@@ -604,6 +601,7 @@ async function initAuth(){
     if(event === "SIGNED_IN" && currentUser && !currentUser.is_anonymous){
       likes = {};
       await Promise.all([loadUserLikes(), loadUserProfile()]);
+      await loadChallengesForUser(); // Récupérer les défis depuis Supabase
       await loadCats();
       if(mapInstance && mapInstance.isStyleLoaded()){ renderMapCats(); updateCatOfDay(); }
       updateAuthUI();
@@ -615,12 +613,12 @@ async function initAuth(){
     if(event === "SIGNED_OUT"){
       currentUser = null;
       likes = {};
-      challenges = CHALLENGES_DEF.map(c=>({...c, done:false}));
+      // NE PAS réinitialiser les défis — ils restent en localStorage
       userProfile = {totalCats:0, streak:0, totalLikes:0};
       $("profile-avatar").innerHTML = "🐱";
       $("profile-name").textContent = "CatSpotter";
       updateAuthUI();
-      if(currentTab==="challenges") renderChallenges();
+      renderProfile();
     }
   });
 }
@@ -856,12 +854,11 @@ function updateCatOfDay(){
 
 function addDynamicHotspots(){
   if(!cats.length||!mapInstance.isStyleLoaded()) return;
-  // Nettoyer anciens layers
   for(let i=0;i<5;i++){
     try{ if(mapInstance.getLayer("hs-"+i)) mapInstance.removeLayer("hs-"+i); }catch(e){}
     try{ if(mapInstance.getSource("hs-"+i)) mapInstance.removeSource("hs-"+i); }catch(e){}
   }
-  // Regrouper par proximité ~800m (0.008 degrés)
+  // Regrouper par proximité ~500m
   const clusters=[], used=new Set();
   cats.forEach((cat,i)=>{
     if(used.has(i)) return;
@@ -869,25 +866,25 @@ function addDynamicHotspots(){
     cats.forEach((o,j)=>{
       if(i===j||used.has(j)) return;
       const d=Math.sqrt(Math.pow(cat.lat-o.lat,2)+Math.pow(cat.lng-o.lng,2));
-      if(d<0.008){cluster.cats.push(o);used.add(j);}
+      if(d<0.005){cluster.cats.push(o);used.add(j);}
     });
     used.add(i);
-    clusters.push(cluster);
+    // Seulement si 3+ chats dans la zone
+    if(cluster.cats.length>=3) clusters.push(cluster);
   });
   clusters.sort((a,b)=>b.cats.length-a.cats.length);
   clusters.slice(0,5).forEach((cl,i)=>{
     const n=cl.cats.length;
-    // Couleur et opacité bien visibles
-    const col = n>=4?"rgba(212,87,42,0.35)":n>=2?"rgba(201,133,58,0.28)":"rgba(123,158,166,0.22)";
+    const col=n>=5?"rgba(212,87,42,0.35)":n>=4?"rgba(201,133,58,0.30)":"rgba(123,158,166,0.25)";
     try {
       mapInstance.addSource("hs-"+i,{type:"geojson",data:{type:"Feature",geometry:{type:"Point",coordinates:[cl.lng,cl.lat]}}});
       mapInstance.addLayer({id:"hs-"+i,type:"circle",source:"hs-"+i,paint:{
-        "circle-radius":["interpolate",["linear"],["zoom"],11,n*20,14,n*60,17,n*120],
+        "circle-radius":["interpolate",["linear"],["zoom"],11,n*25,14,n*70,17,n*130],
         "circle-color":col,
-        "circle-blur":0.6,
+        "circle-blur":0.7,
         "circle-opacity":1,
       }});
-    } catch(e){ console.warn("hotspot error",e); }
+    } catch(e){}
   });
 }
 
@@ -1114,6 +1111,28 @@ function loadChallengesFromStorage(){
 function saveChallengestoStorage(){
   try {
     localStorage.setItem("catspot_challenges", JSON.stringify(challenges));
+  } catch(e){}
+  // Sauvegarder aussi en Supabase si connecté
+  if(currentUser && !currentUser.is_anonymous){
+    sb.from("user_profiles").upsert({
+      id: currentUser.id,
+      challenges_done: challenges.filter(c=>c.done).map(c=>c.key)
+    }, {onConflict:"id"}).then(()=>{}).catch(()=>{});
+  }
+}
+
+async function loadChallengesForUser(){
+  if(!currentUser || currentUser.is_anonymous) return;
+  try {
+    const {data} = await sb.from("user_profiles").select("challenges_done").eq("id", currentUser.id).single();
+    if(data?.challenges_done?.length){
+      challenges = CHALLENGES_DEF.map(def=>({
+        ...def,
+        done: data.challenges_done.includes(def.key)
+      }));
+      saveChallengestoStorage();
+      if(currentTab==="challenges") renderChallenges();
+    }
   } catch(e){}
 }
 
