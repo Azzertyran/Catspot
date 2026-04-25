@@ -643,12 +643,13 @@ async function initAuth(){
     if(event === "SIGNED_OUT"){
       currentUser = null;
       likes = {};
-      // NE PAS réinitialiser les défis — ils restent en localStorage
+      loadLikesFromStorage(); // Restaurer les likes locaux après déconnexion
       userProfile = {totalCats:0, streak:0, totalLikes:0};
       $("profile-avatar").innerHTML = "🐱";
       $("profile-name").textContent = "CatSpotter";
       updateAuthUI();
       renderProfile();
+      if(currentTab==="feed") renderFeed();
     }
   });
 }
@@ -906,21 +907,17 @@ function getCatPinSize(cat){
 function addCatMarker(cat){
   const color = getCatPinColor(cat);
   const size  = getCatPinSize(cat);
-  // Wrapper 0x0 — MapLibre ne touche QUE ce noeud pour transform
+  // Wrapper à la taille du cercle — MapLibre applique transform sur cet élément
+  // On utilise margin négatif pour centrer sans affecter le transform
   const el = document.createElement("div");
   el.className = "cat-pin" + (cat.legend ? " legend" : "");
-  el.style.cssText = "width:0;height:0;position:relative;cursor:pointer";
-  // Inner centré via position absolue — isolé du transform MapLibre
-  const inner = document.createElement("div");
-  const half = Math.round(size/2);
-  inner.style.cssText = `position:absolute;top:-${half}px;left:-${half}px;width:${size}px;height:${size}px;border-radius:50%;background:${color};border:2.5px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,0.25);display:flex;align-items:center;justify-content:center;font-size:${Math.round(size*0.52)}px;line-height:1;user-select:none;pointer-events:none`;
-  inner.textContent = "🐱";
-  el.appendChild(inner);
+  el.style.cssText = `width:${size}px;height:${size}px;margin-left:-${Math.round(size/2)}px;margin-top:-${Math.round(size/2)}px;border-radius:50%;background:${color};border:2.5px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,0.25);display:flex;align-items:center;justify-content:center;font-size:${Math.round(size*0.52)}px;line-height:1;cursor:pointer;user-select:none;--pin-color:${color}`;
+  el.textContent = "🐱";
   el.addEventListener("click", e=>{e.stopPropagation(); openPopup({...cat,color});});
-  const marker = new maplibregl.Marker({element:el, anchor:"center"})
+  const marker = new maplibregl.Marker({element:el, anchor:"top-left"})
     .setLngLat([cat.lng, cat.lat])
     .addTo(mapInstance);
-  markers[cat.id] = {marker, el, inner, color};
+  markers[cat.id] = {marker, el, color};
 }
 
 function updateCatOfDay(){
@@ -980,14 +977,14 @@ function addDynamicHotspots(){
 function openPopup(cat){
   selectedCat=cat;
   // Highlight marqueur
-  Object.values(markers).forEach(({el, inner})=>{
+  Object.values(markers).forEach(({el})=>{
     el.classList.remove("selected");
-    if(inner) inner.style.boxShadow = "0 3px 10px rgba(0,0,0,0.22)";
+    el.style.boxShadow = "0 2px 8px rgba(0,0,0,0.25)";
   });
   if(markers[cat.id]){
     markers[cat.id].el.classList.add("selected");
     const c = markers[cat.id].color;
-    if(markers[cat.id].inner) markers[cat.id].inner.style.boxShadow = `0 0 0 3px #fff, 0 0 0 5px ${c}, 0 6px 20px rgba(0,0,0,0.3)`;
+    markers[cat.id].el.style.boxShadow = `0 0 0 3px #fff, 0 0 0 5px ${c}, 0 6px 20px rgba(0,0,0,0.3)`;
   }
 
   // Emoji box — photo miniature si disponible
@@ -1045,18 +1042,18 @@ function openPopup(cat){
 }
 
 function updatePopupLike(cat){
-  const isLiked=likes[cat.id];
-  $("popup-heart").textContent=isLiked?"❤️":"🤍";
-  $("popup-likes-count").textContent=(cat.likes_count||cat.likes||0)+(isLiked?1:0);
+  const isLiked = !!likes[cat.id];
+  $("popup-heart").textContent = isLiked ? "❤️" : "🤍";
+  $("popup-likes-count").textContent = cat.likes_count || 0;
 }
 
 function closePopup(){
   selectedCat=null;
   $("cat-popup").classList.remove("open");
   $("fab").style.display="flex";
-  Object.values(markers).forEach(({el, inner})=>{
+  Object.values(markers).forEach(({el})=>{
     el.classList.remove("selected");
-    if(inner) inner.style.boxShadow = "0 3px 10px rgba(0,0,0,0.22)";
+    el.style.boxShadow = "0 2px 8px rgba(0,0,0,0.25)";
   });
 }
 
@@ -1419,23 +1416,28 @@ function renderFeed(append=false){
 
 function toggleFeedLike(id){
   const wasLiked = !!likes[id];
-  likes[id]=!wasLiked;
-  const cat=cats.find(c=>c.id===id);
-  // Mettre à jour le compteur local
-  if(cat) cat.likes_count = (cat.likes_count||0) + (likes[id]?1:-1);
-  const btn=$("fl-"+id);
-  if(btn&&cat){btn.innerHTML=(likes[id]?"❤️":"🤍")+" "+(cat.likes_count||0)+" "+t().likes;btn.style.color=likes[id]?"#D4572A":"#8A7F72";}
-  if(selectedCat?.id===id) updatePopupLike(selectedCat);
-  // Persister en localStorage (indépendant du compte)
+  likes[id] = !wasLiked;
+  const cat = cats.find(c=>c.id===id);
+  if(!cat) return;
+  // likes_count = valeur Supabase, on ajuste localement
+  cat.likes_count = Math.max(0, (cat.likes_count||0) + (likes[id] ? 1 : -1));
+  const btn = $("fl-"+id);
+  if(btn){ btn.innerHTML = (likes[id]?"❤️":"🤍")+" "+(cat.likes_count)+" "+t().likes; btn.style.color = likes[id]?"#D4572A":"#8A7F72"; }
+  if(selectedCat?.id===id){ selectedCat.likes_count = cat.likes_count; updatePopupLike(selectedCat); }
   saveLikesToStorage();
   toggleLikeDB(id, wasLiked);
 }
 
 function saveLikesToStorage(){
+  // Ne persister en localStorage que si non connecté (anonyme)
+  // Si connecté, Supabase est la source de vérité
+  if(currentUser && !currentUser.is_anonymous) return;
   try { localStorage.setItem("catspot_likes", JSON.stringify(likes)); } catch(e){}
 }
 
 function loadLikesFromStorage(){
+  // Ne charger le localStorage que si non connecté
+  if(currentUser && !currentUser.is_anonymous) return;
   try {
     const saved = localStorage.getItem("catspot_likes");
     if(saved) { const parsed = JSON.parse(saved); Object.assign(likes, parsed); }
@@ -1885,14 +1887,17 @@ $("loc-manual-btn").addEventListener("click",()=>{
 $("modal-overlay").addEventListener("click",e=>{if(e.target===$("modal-overlay"))closeModal();});
 $("popup-like-btn").addEventListener("click",async ()=>{
   if(!selectedCat) return;
-  const id=selectedCat.id;
+  const id = selectedCat.id;
   const wasLiked = !!likes[id];
-  likes[id]=!wasLiked;
-  const cat=cats.find(c=>c.id===id);
-  if(cat) cat.likes_count = (cat.likes_count||0) + (likes[id]?1:-1);
+  likes[id] = !wasLiked;
+  const cat = cats.find(c=>c.id===id);
+  if(cat){
+    cat.likes_count = Math.max(0, (cat.likes_count||0) + (likes[id] ? 1 : -1));
+    selectedCat.likes_count = cat.likes_count;
+  }
   updatePopupLike(selectedCat);
-  const btn=$("fl-"+id);
-  if(btn&&cat){btn.innerHTML=(likes[id]?"❤️":"🤍")+" "+(cat.likes_count||0)+" "+t().likes;btn.style.color=likes[id]?"#D4572A":"#8A7F72";}
+  const btn = $("fl-"+id);
+  if(btn&&cat){ btn.innerHTML=(likes[id]?"❤️":"🤍")+" "+cat.likes_count+" "+t().likes; btn.style.color=likes[id]?"#D4572A":"#8A7F72"; }
   saveLikesToStorage();
   await toggleLikeDB(id, wasLiked);
 });
