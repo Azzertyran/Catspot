@@ -630,6 +630,7 @@ async function initAuth(){
 
     if(event === "SIGNED_IN" && currentUser && !currentUser.is_anonymous){
       likes = {};
+      localStorage.removeItem("catspot_likes"); // Supabase est la source de vérité quand connecté
       await Promise.all([loadUserLikes(), loadUserProfile()]);
       await loadChallengesForUser(); // Récupérer les défis depuis Supabase
       await loadCats();
@@ -778,12 +779,14 @@ async function loadUserLikes(){
 
 async function saveCat(catData){
   try {
-    console.log("saveCat: tentative avec", JSON.stringify(catData));
     const {data,error} = await sb.from("cats").insert([catData]).select().single();
-    if(error){ console.error("saveCat ERREUR:", error.message, error.details, error.hint); return null; }
-    console.log("saveCat: succès, id=", data.id);
+    if(error){
+      console.error("saveCat ERREUR:", error.message, error.details, error.hint);
+      showToast("❌ Erreur: "+error.message);
+      return null;
+    }
     return data;
-  } catch(e){ console.error("saveCat EXCEPTION:", e); return null; }
+  } catch(e){ console.error("saveCat EXCEPTION:", e); showToast("❌ Erreur de publication"); return null; }
 }
 
 async function toggleLikeDB(catId, wasLiked){
@@ -797,11 +800,21 @@ async function toggleLikeDB(catId, wasLiked){
   }
   try {
     if(wasLiked){
-      // On unlike — supprimer
       await sb.from("likes").delete().eq("user_id",currentUser.id).eq("cat_id",catId);
+      await sb.rpc("decrement_likes", {cat_id: catId}).catch(async ()=>{
+        // Fallback si pas de fonction RPC : mise à jour manuelle
+        const cat = cats.find(c=>c.id===catId);
+        const newCount = Math.max(0, (cat?.likes_count||1)-1);
+        await sb.from("cats").update({likes_count: newCount}).eq("id", catId);
+      });
     } else {
-      // On like — insérer
       await sb.from("likes").insert([{user_id:currentUser.id, cat_id:catId, sighting_id:null}]);
+      await sb.rpc("increment_likes", {cat_id: catId}).catch(async ()=>{
+        // Fallback si pas de fonction RPC : mise à jour manuelle
+        const cat = cats.find(c=>c.id===catId);
+        const newCount = (cat?.likes_count||0)+1;
+        await sb.from("cats").update({likes_count: newCount}).eq("id", catId);
+      });
     }
   } catch(e){ console.error("toggleLikeDB erreur:", e); }
 }
@@ -927,8 +940,8 @@ function updateCatOfDay(){
   $("cod-label").textContent=t().codLabel;
   $("cod-name").textContent=best.name||"Inconnu";
   // Compteur avec likes locaux inclus
-  const realLikes=(best.likes_count||0)+(likes[best.id]?1:0);
-  $("cod-likes").textContent=realLikes+" "+t().likes;
+  const realLikes = best.likes_count || 0;
+  $("cod-likes").textContent = realLikes + " " + t().likes;
   $("cod-banner").classList.add("visible");
   // Rendre cliquable — ouvre la popup du chat
   $("cod-banner").onclick = ()=>{
@@ -1659,12 +1672,12 @@ async function publishSpot(){
     || (lang==="fr"?"Anonyme":"Anonymous");
 
   const saved=await saveCat({
-    name, emoji:selectedEmoji, color, lat:newLat, lng:newLng,
+    name, color, lat:newLat, lng:newLng,
     char:selectedChar||"friendly", sightings:1, likes_count:0, legend:false, description:desc, posted_by
   });
 
   const cat=saved ? {...saved, likes:0, desc:saved.description} : {
-    id:"local-"+Date.now(), name, emoji:selectedEmoji, color,
+    id:"local-"+Date.now(), name, color,
     lat:newLat, lng:newLng, sightings:1, likes_count:0, likes:0,
     created_at:new Date().toISOString(), desc, description:desc, char:selectedChar||"friendly", legend:false
   };
