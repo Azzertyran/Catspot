@@ -57,13 +57,16 @@ input:focus,textarea:focus{outline:none}
 .maplibregl-ctrl-zoom-in,.maplibregl-ctrl-zoom-out{border:none!important}
 #map{position:absolute;top:0;left:0;right:0;bottom:0;z-index:2;pointer-events:none}
 .maplibregl-marker{will-change:transform}
-.cat-pin{width:38px;height:38px;border-radius:50%;border:2.5px solid #fff;display:flex;align-items:center;justify-content:center;font-size:18px;cursor:pointer;box-shadow:0 3px 10px rgba(0,0,0,0.22);background:#fff;transition:background .2s,border-color .2s}
-.cat-pin.selected{box-shadow:0 0 0 3px currentColor,0 4px 16px rgba(0,0,0,0.25)}
-.cat-pin.legend::after{content:"⭐";position:absolute;top:-5px;right:-5px;font-size:10px;pointer-events:none}
+.cat-pin{position:relative;display:flex;align-items:center;justify-content:center;cursor:pointer;border:none;background:none;padding:0;transition:transform .2s}
+.cat-pin:hover{transform:scale(1.15)}
+.cat-pin.selected .cat-pin-inner{box-shadow:0 0 0 3px rgba(255,255,255,0.9),0 0 0 5px var(--pin-color,#D4572A),0 6px 20px rgba(0,0,0,0.3)}
+.cat-pin-inner{width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;box-shadow:0 3px 12px rgba(0,0,0,0.25);transition:box-shadow .2s;background:var(--pin-color,#D4572A)}
+.cat-pin.legend .cat-pin-inner::after{content:"⭐";position:absolute;top:-5px;right:-5px;font-size:10px;pointer-events:none}
 
 /* Cat of day - caché par défaut */
-#cod-banner{position:absolute;top:12px;left:12px;background:rgba(249,246,240,0.96);backdrop-filter:blur(10px);border-radius:14px;padding:9px 13px;display:none;align-items:center;gap:10px;box-shadow:0 2px 16px rgba(0,0,0,0.12);z-index:5;border:1px solid rgba(0,0,0,0.06);max-width:210px;pointer-events:auto}
+#cod-banner{position:absolute;top:12px;left:12px;background:rgba(249,246,240,0.96);backdrop-filter:blur(10px);border-radius:14px;padding:9px 13px;display:none;align-items:center;gap:10px;box-shadow:0 2px 16px rgba(0,0,0,0.12);z-index:5;border:1px solid rgba(0,0,0,0.06);max-width:210px;pointer-events:auto;cursor:pointer;transition:transform .15s,box-shadow .15s}
 #cod-banner.visible{display:flex}
+#cod-banner:hover{transform:scale(1.03);box-shadow:0 4px 22px rgba(0,0,0,0.18)}
 .cod-star{font-size:22px}
 .cod-label{font-size:9px;font-weight:700;color:var(--amber);text-transform:uppercase;letter-spacing:.8px}
 .cod-name{font-family:"Fraunces",serif;font-size:14px;font-weight:700;color:var(--dark)}
@@ -270,6 +273,15 @@ input:focus,textarea:focus{outline:none}
             <div class="cod-likes" id="cod-likes"></div>
           </div>
         </div>
+        <!-- Légende couleurs temporelles -->
+        <div id="pin-legend" style="position:absolute;bottom:80px;right:10px;background:rgba(249,246,240,0.93);backdrop-filter:blur(8px);border-radius:10px;padding:7px 10px;z-index:5;border:1px solid rgba(0,0,0,0.07);box-shadow:0 2px 10px rgba(0,0,0,0.1)">
+          <div style="font-size:9px;font-weight:700;color:#8A7F72;text-transform:uppercase;letter-spacing:.7px;margin-bottom:5px">Vu il y a</div>
+          <div style="display:flex;flex-direction:column;gap:4px">
+            <div style="display:flex;align-items:center;gap:6px"><div style="width:10px;height:10px;border-radius:50%;background:#E8541A"></div><span style="font-size:10px;color:#444">Moins d'1h</span></div>
+            <div style="display:flex;align-items:center;gap:6px"><div style="width:10px;height:10px;border-radius:50%;background:#3B82F6"></div><span style="font-size:10px;color:#444">Aujourd'hui</span></div>
+            <div style="display:flex;align-items:center;gap:6px"><div style="width:10px;height:10px;border-radius:50%;background:#9CA3AF"></div><span style="font-size:10px;color:#444">Plus ancien</span></div>
+          </div>
+        </div>
         <div id="map-empty" class="visible">
           <div class="map-empty-bubble">
             <div class="map-empty-icon">🐱</div>
@@ -437,10 +449,6 @@ input:focus,textarea:focus{outline:none}
     </div>
     <input class="modal-input" id="input-name" placeholder="Nom du chat (optionnel)"/>
     <input class="modal-input" id="input-desc" placeholder="Une anecdote ? (optionnel)"/>
-    <div>
-      <div style="font-size:12px;font-weight:700;color:var(--muted);margin-bottom:7px" id="emoji-label">Choisis un emoji</div>
-      <div id="emoji-select" style="display:flex;flex-wrap:wrap;gap:8px"></div>
-    </div>
     <div>
       <div style="font-size:12px;font-weight:700;color:var(--muted);margin-bottom:7px" id="char-label">Caractère</div>
       <div class="char-select" id="char-select"></div>
@@ -868,20 +876,54 @@ function renderMapCats(){
   }
 }
 
+function getCatPinColor(cat){
+  // Couleur selon la fraîcheur du spot
+  if(!cat.created_at) return "#8B8B8B";
+  const ageMs = Date.now() - new Date(cat.created_at).getTime();
+  const ageH = ageMs / 3600000;
+  if(ageH < 1) return "#E8541A";   // orange vif — vu il y a <1h
+  if(ageH < 24) return "#3B82F6";  // bleu — vu aujourd'hui
+  return "#9CA3AF";                 // gris — plus ancien
+}
+
+function getCatPinSize(cat){
+  // Taille selon popularité (likes)
+  const likes = cat.likes_count || 0;
+  if(likes >= 10) return 46;
+  if(likes >= 5) return 40;
+  return 34;
+}
+
+function pawSVG(size, color){
+  // SVG patte de chat propre
+  const s = size;
+  return `<svg width="${s}" height="${s}" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg">
+    <circle cx="20" cy="20" r="20" fill="${color}"/>
+    <!-- Patte centrale -->
+    <ellipse cx="20" cy="24" rx="7" ry="8" fill="rgba(255,255,255,0.92)"/>
+    <!-- Coussinets hauts -->
+    <ellipse cx="12" cy="16" rx="4" ry="5" fill="rgba(255,255,255,0.92)"/>
+    <ellipse cx="20" cy="13" rx="4" ry="5" fill="rgba(255,255,255,0.92)"/>
+    <ellipse cx="28" cy="16" rx="4" ry="5" fill="rgba(255,255,255,0.92)"/>
+  </svg>`;
+}
+
 function addCatMarker(cat){
-  const colors=["#D4572A","#C9853A","#7B9EA6","#B85C38","#8B6CA6","#C0392B","#2D6A4F","#E76F51"];
-  // Couleur basée sur l'ID pour être unique et stable
-  const idx = cat.id ? cat.id.charCodeAt(0) % colors.length : 0;
-  const color=cat.color||colors[idx];
-  const el=document.createElement("button");
-  el.className="cat-pin"+(cat.legend?" legend":"");
-  el.innerHTML=cat.emoji||"🐱";
-  el.style.cssText=`background:#fff;border-color:${color};color:${color};border-width:2.5px`;
+  const color = getCatPinColor(cat);
+  const size  = getCatPinSize(cat);
+  const el = document.createElement("button");
+  el.className = "cat-pin" + (cat.legend ? " legend" : "");
+  el.style.cssText = `--pin-color:${color};width:${size}px;height:${size}px`;
+  const inner = document.createElement("div");
+  inner.className = "cat-pin-inner";
+  inner.style.cssText = `width:${size}px;height:${size}px;background:none`;
+  inner.innerHTML = pawSVG(size, color);
+  el.appendChild(inner);
   el.addEventListener("click", e=>{e.stopPropagation(); openPopup({...cat,color});});
-  const marker=new maplibregl.Marker({element:el,anchor:"center",offset:[0,0]})
+  const marker = new maplibregl.Marker({element:el, anchor:"center", offset:[0,0]})
     .setLngLat([cat.lng, cat.lat])
     .addTo(mapInstance);
-  markers[cat.id]={marker,el,color};
+  markers[cat.id] = {marker, el, color};
 }
 
 function updateCatOfDay(){
@@ -894,6 +936,12 @@ function updateCatOfDay(){
   const realLikes=(best.likes_count||0)+(likes[best.id]?1:0);
   $("cod-likes").textContent=realLikes+" "+t().likes;
   $("cod-banner").classList.add("visible");
+  // Rendre cliquable — ouvre la popup du chat
+  $("cod-banner").onclick = ()=>{
+    const color = getCatPinColor(best);
+    openPopup({...best, color});
+    if(mapInstance) mapInstance.flyTo({center:[best.lng,best.lat], zoom:15, duration:600});
+  };
 }
 
 function addDynamicHotspots(){
@@ -935,15 +983,11 @@ function addDynamicHotspots(){
 function openPopup(cat){
   selectedCat=cat;
   // Highlight marqueur
-  Object.values(markers).forEach(({el,color})=>{
+  Object.values(markers).forEach(({el})=>{
     el.classList.remove("selected");
-    el.style.background="#fff";
-    el.style.color=color;
   });
   if(markers[cat.id]){
     markers[cat.id].el.classList.add("selected");
-    markers[cat.id].el.style.background=cat.color;
-    markers[cat.id].el.style.color="#fff";
   }
 
   // Emoji box — photo miniature si disponible
@@ -1010,10 +1054,8 @@ function closePopup(){
   selectedCat=null;
   $("cat-popup").classList.remove("open");
   $("fab").style.display="flex";
-  Object.values(markers).forEach(({el,color})=>{
+  Object.values(markers).forEach(({el})=>{
     el.classList.remove("selected");
-    el.style.background="#fff";
-    if(color){el.style.color=color; el.style.borderColor=color;}
   });
 }
 
