@@ -50,7 +50,7 @@ input:focus,textarea:focus{outline:none}
 .tab-panel{position:absolute;inset:0;overflow-y:auto;overflow-x:hidden;display:none;padding-bottom:calc(var(--nav) + 16px)}
 .tab-panel.active{display:block}
 #tab-map{padding:0;display:none}
-#tab-map.active{display:flex;flex-direction:column;position:absolute;top:0;left:0;right:0;bottom:0;overflow:hidden}
+#tab-map.active{display:flex;flex-direction:column;position:absolute;inset:0}
 
 /* MAP */
 #maplibre{position:absolute;top:0;left:0;right:0;bottom:0;z-index:1}
@@ -194,7 +194,7 @@ input:focus,textarea:focus{outline:none}
 .support-arrow{font-size:18px;color:var(--muted);margin-left:auto}
 
 /* NAV */
-#nav{display:flex;background:var(--light);border-top:1px solid rgba(0,0,0,0.07);height:var(--nav);flex-shrink:0;padding-bottom:env(safe-area-inset-bottom,0px)}
+#nav{display:flex;background:var(--light);border-top:1px solid rgba(0,0,0,0.07);height:var(--nav);flex-shrink:0;padding-bottom:env(safe-area-inset-bottom,0px);position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:430px;z-index:30}
 .nav-btn{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;color:var(--muted);transition:color .15s}
 .nav-btn.active{color:var(--terra)}
 .nav-icon{font-size:20px;line-height:1}
@@ -877,8 +877,8 @@ function addDynamicHotspots(){
   clusters.sort((a,b)=>b.cats.length-a.cats.length);
   clusters.slice(0,5).forEach((cl,i)=>{
     const n=cl.cats.length;
-    const alpha=Math.min(n/8,1)*0.28;
-    const col=n>=5?`rgba(212,87,42,${alpha})`:n>=3?`rgba(201,133,58,${alpha})`:`rgba(123,158,166,${alpha})`;
+    const alpha=Math.min(n/5,1)*0.4; // Plus visible
+    const col=n>=4?`rgba(212,87,42,${alpha})`:n>=2?`rgba(201,133,58,${alpha})`:`rgba(123,158,166,${alpha})`;
     try {
       mapInstance.addSource("hs-"+i,{type:"geojson",data:{type:"Feature",geometry:{type:"Point",coordinates:[cl.lng,cl.lat]}}});
       mapInstance.addLayer({id:"hs-"+i,type:"circle",source:"hs-"+i,paint:{
@@ -1097,15 +1097,21 @@ function toggleFeedLike(id){
 // Charger les défis depuis localStorage
 function loadChallengesFromStorage(){
   try {
-    const saved = localStorage.getItem("catspot_challenges") || sessionStorage.getItem("catspot_challenges");
-    if(saved) challenges = JSON.parse(saved);
-  } catch(e){}
+    const saved = localStorage.getItem("catspot_challenges");
+    if(saved){
+      const parsed = JSON.parse(saved);
+      // Fusionner avec CHALLENGES_DEF pour garder les nouvelles clés
+      challenges = CHALLENGES_DEF.map(def => {
+        const s = parsed.find(p=>p.key===def.key);
+        return s ? {...def, done:s.done} : def;
+      });
+    }
+  } catch(e){ challenges = CHALLENGES_DEF.map(c=>({...c,done:false})); }
 }
 
 function saveChallengestoStorage(){
   try {
     localStorage.setItem("catspot_challenges", JSON.stringify(challenges));
-    sessionStorage.setItem("catspot_challenges", JSON.stringify(challenges));
   } catch(e){}
 }
 
@@ -1532,10 +1538,10 @@ if(navigator.geolocation){
   try {
     await initAuth();
     await loadCats();
-    // Mettre à jour la carte si elle est déjà chargée
     if(mapInstance && mapInstance.isStyleLoaded()){
       renderMapCats();
       updateCatOfDay();
+      addDynamicHotspots();
     }
     if(currentTab==="feed") renderFeed();
     renderProfile();
