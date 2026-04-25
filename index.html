@@ -45,7 +45,7 @@ input:focus,textarea:focus{outline:none}
 
 /* TABS */
 #tabs{flex:1;position:relative;min-height:0;overflow:hidden}
-.tab-panel{position:absolute;inset:0;overflow-y:auto;overflow-x:hidden;display:none;padding-bottom:calc(var(--nav) + 16px)}
+.tab-panel{position:absolute;inset:0;overflow-y:auto;overflow-x:hidden;display:none;padding-bottom:calc(var(--nav) + 32px)}
 .tab-panel.active{display:block}
 #tab-map{padding:0;display:none}
 #tab-map.active{display:flex;flex-direction:column;position:absolute;inset:0}
@@ -116,11 +116,11 @@ input:focus,textarea:focus{outline:none}
 .feed-meta{font-size:11px;color:var(--muted);margin-top:2px}
 .feed-pin{margin-left:auto;font-size:18px}
 /* Photo feed : hauteur fixe, contain pour ne pas couper */
-.feed-photo{margin-top:12px;position:relative;background:#111;overflow:hidden;min-height:120px;max-height:320px;display:flex;align-items:center;justify-content:center}
-.feed-photo img{width:100%;max-height:320px;object-fit:contain;display:block}
+.feed-photo{margin-top:12px;position:relative;background:#111;overflow:hidden;min-height:120px;max-height:320px;display:flex;align-items:center;justify-content:center;isolation:isolate}
+.feed-photo img{width:100%;max-height:320px;object-fit:contain;display:block;position:relative;z-index:1}
 .feed-photo-gradient{position:absolute;inset:0;pointer-events:none}
-.feed-photo-emoji{font-size:76px;padding:40px 0}
-.feed-photo-loc{position:absolute;bottom:10px;left:12px;background:rgba(0,0,0,.55);color:#fff;font-size:11px;font-weight:600;padding:4px 10px;border-radius:20px;backdrop-filter:blur(4px)}
+.feed-photo-emoji{font-size:76px;padding:40px 0;position:relative;z-index:1}
+.feed-photo-loc{position:absolute;bottom:10px;left:12px;background:rgba(0,0,0,.55);color:#fff;font-size:11px;font-weight:600;padding:4px 10px;border-radius:20px;backdrop-filter:blur(4px);z-index:2}
 .feed-desc{font-size:13px;color:#666;padding:10px 14px 0;font-style:italic}
 .feed-actions{display:flex;align-items:center;justify-content:space-between;padding:10px 14px 13px;border-top:1px solid #f5f3f0;margin-top:10px}
 .feed-like-btn{display:flex;align-items:center;gap:5px;font-size:14px;font-weight:700}
@@ -456,7 +456,7 @@ const T = {
     chSection:"Défis", badgesTitle:"Badges",
     friendly:"Câlin", wild:"Sauvage", shy:"Timide", playful:"Joueur",
     legend:"Légendaire ⭐",
-    streakDays:n=>n+" jours", streakLbl:"Streak actif",
+    streakDays:n=>n+" jour"+(n>1?"s":""), streakLbl:"Streak actif",
     proTitle:"Catspot Pro ⭐", proF1:"Stats avancées sur tes spots",
     proF2:"Badges exclusifs", proF3:"Carte en temps réel", proF4:"Mode sans pub",
     proBtn:"Devenir Pro — 2,99 €/mois", proAnnual:"ou 19,99 €/an (économise 36%)",
@@ -496,7 +496,7 @@ const T = {
     chSection:"Challenges", badgesTitle:"Badges",
     friendly:"Friendly", wild:"Wild", shy:"Shy", playful:"Playful",
     legend:"Legendary ⭐",
-    streakDays:n=>n+" days", streakLbl:"Active streak",
+    streakDays:n=>n+" day"+(n>1?"s":""), streakLbl:"Active streak",
     proTitle:"Catspot Pro ⭐", proF1:"Advanced stats on your spots",
     proF2:"Exclusive badges", proF3:"Real-time map", proF4:"Ad-free mode",
     proBtn:"Go Pro — €2.99/month", proAnnual:"or €19.99/year (save 36%)",
@@ -720,6 +720,16 @@ async function loadUserLikes(){
   try {
     const {data} = await sb.from("likes").select("cat_id").eq("user_id",currentUser.id);
     if(data) data.forEach(l=>{likes[l.cat_id]=true;});
+    // Syncer les likes anonymes faits avant connexion
+    const pending = JSON.parse(localStorage.getItem("catspot_pending_likes")||"[]");
+    if(pending.length){
+      for(const catId of pending){
+        if(!likes[catId]){
+          try { await sb.from("likes").insert([{user_id:currentUser.id, cat_id:catId, sighting_id:null}]); likes[catId]=true; } catch(e){}
+        }
+      }
+      localStorage.removeItem("catspot_pending_likes");
+    }
   } catch(e){}
 }
 
@@ -733,15 +743,24 @@ async function saveCat(catData){
   } catch(e){ console.error("saveCat EXCEPTION:", e); return null; }
 }
 
-async function toggleLikeDB(catId){
-  if(!currentUser) return;
+async function toggleLikeDB(catId, wasLiked){
+  if(!currentUser){
+    // Sauvegarder en localStorage pour syncer à la reconnexion
+    const pending = JSON.parse(localStorage.getItem("catspot_pending_likes")||"[]");
+    if(!wasLiked && !pending.includes(catId)) pending.push(catId);
+    else { const i=pending.indexOf(catId); if(i>-1) pending.splice(i,1); }
+    localStorage.setItem("catspot_pending_likes", JSON.stringify(pending));
+    return;
+  }
   try {
-    if(likes[catId]){
+    if(wasLiked){
+      // On unlike — supprimer
       await sb.from("likes").delete().eq("user_id",currentUser.id).eq("cat_id",catId);
     } else {
+      // On like — insérer
       await sb.from("likes").insert([{user_id:currentUser.id, cat_id:catId, sighting_id:null}]);
     }
-  } catch(e){}
+  } catch(e){ console.error("toggleLikeDB erreur:", e); }
 }
 
 async function uploadPhoto(file, catId){
@@ -1085,12 +1104,15 @@ function renderFeed(append=false){
 }
 
 function toggleFeedLike(id){
-  likes[id]=!likes[id];
+  const wasLiked = !!likes[id];
+  likes[id]=!wasLiked;
   const cat=cats.find(c=>c.id===id);
+  // Mettre à jour le compteur local
+  if(cat) cat.likes_count = (cat.likes_count||0) + (likes[id]?1:-1);
   const btn=$("fl-"+id);
-  if(btn&&cat){btn.innerHTML=(likes[id]?"❤️":"🤍")+" "+((cat.likes_count||0)+(likes[id]?1:0))+" "+t().likes;btn.style.color=likes[id]?"#D4572A":"#8A7F72";}
+  if(btn&&cat){btn.innerHTML=(likes[id]?"❤️":"🤍")+" "+(cat.likes_count||0)+" "+t().likes;btn.style.color=likes[id]?"#D4572A":"#8A7F72";}
   if(selectedCat?.id===id) updatePopupLike(selectedCat);
-  toggleLikeDB(id);
+  toggleLikeDB(id, wasLiked);
 }
 
 // ── CHALLENGES ────────────────────────────────────────────────
@@ -1483,9 +1505,15 @@ $("modal-overlay").addEventListener("click",e=>{if(e.target===$("modal-overlay")
 $("popup-like-btn").addEventListener("click",async ()=>{
   if(!selectedCat) return;
   const id=selectedCat.id;
-  likes[id]=!likes[id];
+  const wasLiked = !!likes[id];
+  likes[id]=!wasLiked;
+  const cat=cats.find(c=>c.id===id);
+  if(cat) cat.likes_count = (cat.likes_count||0) + (likes[id]?1:-1);
   updatePopupLike(selectedCat);
-  await toggleLikeDB(id);
+  // Mettre à jour le feed si visible
+  const btn=$("fl-"+id);
+  if(btn&&cat){btn.innerHTML=(likes[id]?"❤️":"🤍")+" "+(cat.likes_count||0)+" "+t().likes;btn.style.color=likes[id]?"#D4572A":"#8A7F72";}
+  await toggleLikeDB(id, wasLiked);
 });
 document.querySelectorAll(".nav-btn").forEach(b=>b.addEventListener("click",()=>switchTab(b.dataset.tab)));
 $("pro-btn").addEventListener("click",()=>showToast("🚀 Bientôt disponible !"));
