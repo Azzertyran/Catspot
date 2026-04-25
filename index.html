@@ -577,6 +577,7 @@ let currentTab = "map";
 let cats = [];
 let challenges = CHALLENGES_DEF.map(c=>({...c, done:false}));
 let likes = {};
+let commentCounts = {}; // {catId: number}
 let selectedCat = null;
 let mapInstance = null;
 let markers = {};
@@ -715,7 +716,19 @@ async function loadCats(){
     // Mapper description -> desc pour compatibilité avec le reste du code
     cats = (data||[]).map(c=>({...c, likes:c.likes_count||0, desc:c.description||c.desc||null}));
     console.log("loadCats: "+cats.length+" chats chargés");
+    // Charger les compteurs de commentaires
+    await loadCommentCounts();
   } catch(e){ console.error("loadCats exception:", e); cats=[]; }
+}
+
+async function loadCommentCounts(){
+  if(!cats.length) return;
+  try {
+    const catIds = cats.map(c=>c.id);
+    const {data} = await sb.from("comments").select("cat_id").in("cat_id", catIds);
+    commentCounts = {};
+    (data||[]).forEach(row=>{ commentCounts[row.cat_id] = (commentCounts[row.cat_id]||0)+1; });
+  } catch(e){ console.warn("loadCommentCounts:", e); }
 }
 
 async function loadUserProfile(){
@@ -1266,6 +1279,15 @@ async function postComment(catId){
   const author=currentUser?.user_metadata?.full_name||currentUser?.email?.split("@")[0]||(lang==="fr"?"Anonyme":"Anonymous");
   try {
     await sb.from("comments").insert([{cat_id:catId,text,author}]);
+    // Mettre à jour le compteur local
+    commentCounts[catId] = (commentCounts[catId]||0)+1;
+    // Mettre à jour le bouton dans le feed sans re-render complet
+    const feedBtn = document.querySelector(`button[onclick="showComments('${catId}')"]`);
+    if(feedBtn){
+      const n = commentCounts[catId];
+      feedBtn.style.color = "var(--terra)";
+      feedBtn.innerHTML = `💬 ${n} commentaire${n>1?"s":""}`;
+    }
     const list=document.getElementById("comments-list");
     if(list){
       const div=document.createElement("div");
@@ -1375,7 +1397,9 @@ function renderFeed(append=false){
         <button class='feed-like-btn' id='fl-${cat.id}' onclick='toggleFeedLike("${cat.id}")' style='color:${isLiked?"#D4572A":"#8A7F72"}'>
           ${isLiked?"❤️":"🤍"} ${(cat.likes_count||0)+(isLiked?1:0)} ${t().likes}
         </button>
-        <button onclick="showComments('${cat.id}')" style="background:none;border:none;font-size:13px;color:var(--muted);cursor:pointer;font-family:'DM Sans',sans-serif;font-weight:600;display:flex;align-items:center;gap:4px">💬 Commenter</button>
+        <button onclick="showComments('${cat.id}')" style="background:none;border:none;font-size:13px;color:${(commentCounts[cat.id]||0)>0?"var(--terra)":"var(--muted)"};cursor:pointer;font-family:'DM Sans',sans-serif;font-weight:600;display:flex;align-items:center;gap:4px">
+          💬 ${(commentCounts[cat.id]||0)>0 ? commentCounts[cat.id]+" commentaire"+(commentCounts[cat.id]>1?"s":"") : (lang==="fr"?"Commenter":"Comment")}
+        </button>
       </div>
     </div>`;
   }).join("");
