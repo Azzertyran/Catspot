@@ -57,11 +57,9 @@ input:focus,textarea:focus{outline:none}
 .maplibregl-ctrl-zoom-in,.maplibregl-ctrl-zoom-out{border:none!important}
 #map{position:absolute;top:0;left:0;right:0;bottom:0;z-index:2;pointer-events:none}
 .maplibregl-marker{will-change:transform}
-.cat-pin{position:relative;display:flex;align-items:center;justify-content:center;cursor:pointer;border:none;background:none;padding:0;transition:transform .2s}
-.cat-pin:hover{transform:scale(1.15)}
-.cat-pin.selected .cat-pin-inner{box-shadow:0 0 0 3px rgba(255,255,255,0.9),0 0 0 5px var(--pin-color,#D4572A),0 6px 20px rgba(0,0,0,0.3)}
-.cat-pin-inner{width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;box-shadow:0 3px 12px rgba(0,0,0,0.25);transition:box-shadow .2s;background:var(--pin-color,#D4572A)}
-.cat-pin.legend .cat-pin-inner::after{content:"⭐";position:absolute;top:-5px;right:-5px;font-size:10px;pointer-events:none}
+.cat-pin{position:relative;}
+.cat-pin.selected{box-shadow:0 0 0 3px #fff,0 0 0 5px var(--pin-color,#D4572A),0 6px 20px rgba(0,0,0,0.3)!important;transform:scale(1.1)}
+.cat-pin.legend::after{content:"⭐";position:absolute;top:-5px;right:-5px;font-size:10px;pointer-events:none;line-height:1}
 
 /* Cat of day - caché par défaut */
 #cod-banner{position:absolute;top:12px;left:12px;background:rgba(249,246,240,0.96);backdrop-filter:blur(10px);border-radius:14px;padding:9px 13px;display:none;align-items:center;gap:10px;box-shadow:0 2px 16px rgba(0,0,0,0.12);z-index:5;border:1px solid rgba(0,0,0,0.06);max-width:210px;pointer-events:auto;cursor:pointer;transition:transform .15s,box-shadow .15s}
@@ -890,35 +888,18 @@ function renderMapCats(){
 }
 
 function getCatPinColor(cat){
-  // Couleur selon la fraîcheur du spot
-  if(!cat.created_at) return "#8B8B8B";
-  const ageMs = Date.now() - new Date(cat.created_at).getTime();
-  const ageH = ageMs / 3600000;
-  if(ageH < 1) return "#E8541A";   // orange vif — vu il y a <1h
-  if(ageH < 24) return "#3B82F6";  // bleu — vu aujourd'hui
+  if(!cat.created_at) return "#9CA3AF";
+  const ageH = (Date.now() - new Date(cat.created_at).getTime()) / 3600000;
+  if(ageH < 1)  return "#E8541A";  // orange vif — < 1h
+  if(ageH < 24) return "#3B82F6";  // bleu — aujourd'hui
   return "#9CA3AF";                 // gris — plus ancien
 }
 
 function getCatPinSize(cat){
-  // Taille selon popularité (likes)
   const likes = cat.likes_count || 0;
-  if(likes >= 10) return 46;
-  if(likes >= 5) return 40;
-  return 34;
-}
-
-function pawSVG(size, color){
-  // SVG patte de chat propre
-  const s = size;
-  return `<svg width="${s}" height="${s}" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg">
-    <circle cx="20" cy="20" r="20" fill="${color}"/>
-    <!-- Patte centrale -->
-    <ellipse cx="20" cy="24" rx="7" ry="8" fill="rgba(255,255,255,0.92)"/>
-    <!-- Coussinets hauts -->
-    <ellipse cx="12" cy="16" rx="4" ry="5" fill="rgba(255,255,255,0.92)"/>
-    <ellipse cx="20" cy="13" rx="4" ry="5" fill="rgba(255,255,255,0.92)"/>
-    <ellipse cx="28" cy="16" rx="4" ry="5" fill="rgba(255,255,255,0.92)"/>
-  </svg>`;
+  if(likes >= 10) return 44;
+  if(likes >= 5)  return 38;
+  return 32;
 }
 
 function addCatMarker(cat){
@@ -926,12 +907,10 @@ function addCatMarker(cat){
   const size  = getCatPinSize(cat);
   const el = document.createElement("button");
   el.className = "cat-pin" + (cat.legend ? " legend" : "");
-  el.style.cssText = `--pin-color:${color};width:${size}px;height:${size}px`;
-  const inner = document.createElement("div");
-  inner.className = "cat-pin-inner";
-  inner.style.cssText = `width:${size}px;height:${size}px;background:none`;
-  inner.innerHTML = pawSVG(size, color);
-  el.appendChild(inner);
+  el.style.cssText = `--pin-color:${color};width:${size}px;height:${size}px;border-radius:50%;background:${color};border:2.5px solid #fff;box-shadow:0 3px 10px rgba(0,0,0,0.22);display:flex;align-items:center;justify-content:center;font-size:${Math.round(size*0.52)}px;cursor:pointer;padding:0;line-height:1;position:relative;transition:transform .15s`;
+  el.textContent = "🐱";
+  el.addEventListener("mouseenter", ()=>{ el.style.transform="scale(1.2)"; });
+  el.addEventListener("mouseleave", ()=>{ el.style.transform=el.classList.contains("selected")?"scale(1.1)":"scale(1)"; });
   el.addEventListener("click", e=>{e.stopPropagation(); openPopup({...cat,color});});
   const marker = new maplibregl.Marker({element:el, anchor:"center", offset:[0,0]})
     .setLngLat([cat.lng, cat.lat])
@@ -1548,13 +1527,11 @@ function openModal(){
   $("photo-btns").style.display="flex";
   $("photo-camera").value="";
   $("photo-gallery").value="";
-  renderEmojiSelect();
   renderCharSelect();
   $("modal-title").textContent=t().newSpot;
   $("photo-tip").textContent=t().photoTip;
   $("input-name").placeholder=t().catName;
   $("input-desc").placeholder=t().catDesc;
-  $("emoji-label").textContent=lang==="fr"?"Choisis un emoji":"Choose an emoji";
   $("char-label").textContent=t().charLabel;
   $("modal-cancel").textContent=t().cancel;
   $("modal-publish").textContent=t().publish;
