@@ -906,15 +906,20 @@ function getCatPinSize(cat){
 function addCatMarker(cat){
   const color = getCatPinColor(cat);
   const size  = getCatPinSize(cat);
-  const el = document.createElement("button");
+  // Élément racine : RIEN dessus — MapLibre utilise transform sur cet élément
+  const el = document.createElement("div");
   el.className = "cat-pin" + (cat.legend ? " legend" : "");
-  el.style.cssText = `--pin-color:${color};width:${size}px;height:${size}px;border-radius:50%;background:${color};border:2.5px solid #fff;box-shadow:0 3px 10px rgba(0,0,0,0.22);display:flex;align-items:center;justify-content:center;font-size:${Math.round(size*0.52)}px;cursor:pointer;padding:0;line-height:1;position:relative`;
-  el.textContent = "🐱";
+  el.style.cssText = `--pin-color:${color};width:${size}px;height:${size}px;cursor:pointer;position:relative`;
+  // Enfant : tout le style visuel isolé ici
+  const inner = document.createElement("div");
+  inner.style.cssText = `width:${size}px;height:${size}px;border-radius:50%;background:${color};border:2.5px solid #fff;box-shadow:0 3px 10px rgba(0,0,0,0.22);display:flex;align-items:center;justify-content:center;font-size:${Math.round(size*0.52)}px;line-height:1;pointer-events:none;user-select:none`;
+  inner.textContent = "🐱";
+  el.appendChild(inner);
   el.addEventListener("click", e=>{e.stopPropagation(); openPopup({...cat,color});});
-  const marker = new maplibregl.Marker({element:el, anchor:"center", offset:[0,0]})
+  const marker = new maplibregl.Marker({element:el, anchor:"center"})
     .setLngLat([cat.lng, cat.lat])
     .addTo(mapInstance);
-  markers[cat.id] = {marker, el, color};
+  markers[cat.id] = {marker, el, inner, color};
 }
 
 function updateCatOfDay(){
@@ -974,11 +979,14 @@ function addDynamicHotspots(){
 function openPopup(cat){
   selectedCat=cat;
   // Highlight marqueur
-  Object.values(markers).forEach(({el})=>{
+  Object.values(markers).forEach(({el, inner})=>{
     el.classList.remove("selected");
+    if(inner) inner.style.boxShadow = "0 3px 10px rgba(0,0,0,0.22)";
   });
   if(markers[cat.id]){
     markers[cat.id].el.classList.add("selected");
+    const c = markers[cat.id].color;
+    if(markers[cat.id].inner) markers[cat.id].inner.style.boxShadow = `0 0 0 3px #fff, 0 0 0 5px ${c}, 0 6px 20px rgba(0,0,0,0.3)`;
   }
 
   // Emoji box — photo miniature si disponible
@@ -1045,8 +1053,9 @@ function closePopup(){
   selectedCat=null;
   $("cat-popup").classList.remove("open");
   $("fab").style.display="flex";
-  Object.values(markers).forEach(({el})=>{
+  Object.values(markers).forEach(({el, inner})=>{
     el.classList.remove("selected");
+    if(inner) inner.style.boxShadow = "0 3px 10px rgba(0,0,0,0.22)";
   });
 }
 
@@ -1174,12 +1183,21 @@ function getFilteredCats(){
 }
 
 // ── RE-SPOTTER ────────────────────────────────────────────────
+// Set des cats déjà re-spottés cette session (persisté en localStorage)
+let spottedSet = new Set(JSON.parse(localStorage.getItem("catspot_spotted")||"[]"));
+
 async function reSpot(catId){
   const cat=cats.find(c=>c.id===catId);
   if(!cat) return;
+  if(spottedSet.has(catId)){
+    showToast("👀 "+(lang==="fr"?"Tu l'as déjà signalé !":"You already spotted this one!"));
+    return;
+  }
   try {
     await sb.from("cats").update({sightings:(cat.sightings||1)+1}).eq("id",catId);
     cat.sightings=(cat.sightings||1)+1;
+    spottedSet.add(catId);
+    try { localStorage.setItem("catspot_spotted", JSON.stringify([...spottedSet])); } catch(e){}
     const poster=cat.posted_by||(lang==="fr"?"Anonyme":"Anonymous");
     $("popup-meta").textContent="Par "+poster+" · "+t().sightings(cat.sightings)+" · "+fmtAgo(cat.created_at||new Date().toISOString());
     showToast("🐾 "+(lang==="fr"?"Signalement ajouté !":"Sighting added!"));
@@ -1407,7 +1425,20 @@ function toggleFeedLike(id){
   const btn=$("fl-"+id);
   if(btn&&cat){btn.innerHTML=(likes[id]?"❤️":"🤍")+" "+(cat.likes_count||0)+" "+t().likes;btn.style.color=likes[id]?"#D4572A":"#8A7F72";}
   if(selectedCat?.id===id) updatePopupLike(selectedCat);
+  // Persister en localStorage (indépendant du compte)
+  saveLikesToStorage();
   toggleLikeDB(id, wasLiked);
+}
+
+function saveLikesToStorage(){
+  try { localStorage.setItem("catspot_likes", JSON.stringify(likes)); } catch(e){}
+}
+
+function loadLikesFromStorage(){
+  try {
+    const saved = localStorage.getItem("catspot_likes");
+    if(saved) { const parsed = JSON.parse(saved); Object.assign(likes, parsed); }
+  } catch(e){}
 }
 
 // ── CHALLENGES ────────────────────────────────────────────────
@@ -1861,6 +1892,7 @@ $("popup-like-btn").addEventListener("click",async ()=>{
   updatePopupLike(selectedCat);
   const btn=$("fl-"+id);
   if(btn&&cat){btn.innerHTML=(likes[id]?"❤️":"🤍")+" "+(cat.likes_count||0)+" "+t().likes;btn.style.color=likes[id]?"#D4572A":"#8A7F72";}
+  saveLikesToStorage();
   await toggleLikeDB(id, wasLiked);
 });
 $("popup-respott-btn").addEventListener("click",(e)=>{ e.stopPropagation(); if(selectedCat) reSpot(selectedCat.id); });
@@ -1946,6 +1978,7 @@ if(navigator.geolocation){
 
   // Lancer la carte IMMÉDIATEMENT — pas d'attente
   loadChallengesFromStorage();
+  loadLikesFromStorage();
   initMap();
   renderChallenges();
   renderProfile();
