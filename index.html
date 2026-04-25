@@ -50,7 +50,7 @@ input:focus,textarea:focus{outline:none}
 .tab-panel{position:absolute;inset:0;overflow-y:auto;overflow-x:hidden;display:none;padding-bottom:calc(var(--nav) + 16px)}
 .tab-panel.active{display:block}
 #tab-map{padding:0;display:none}
-#tab-map.active{display:block;position:absolute;inset:0}
+#tab-map.active{display:flex;flex-direction:column;position:absolute;top:0;left:0;right:0;bottom:0;overflow:hidden}
 
 /* MAP */
 #maplibre{position:absolute;top:0;left:0;right:0;bottom:0;z-index:1}
@@ -419,6 +419,10 @@ input:focus,textarea:focus{outline:none}
     </div>
     <input class="modal-input" id="input-name" placeholder="Nom du chat (optionnel)"/>
     <input class="modal-input" id="input-desc" placeholder="Une anecdote ? (optionnel)"/>
+    <div>
+      <div style="font-size:12px;font-weight:700;color:var(--muted);margin-bottom:7px" id="emoji-label">Choisis un emoji</div>
+      <div id="emoji-select" style="display:flex;flex-wrap:wrap;gap:8px"></div>
+    </div>
     <div>
       <div style="font-size:12px;font-weight:700;color:var(--muted);margin-bottom:7px" id="char-label">Caractère</div>
       <div class="char-select" id="char-select"></div>
@@ -825,19 +829,16 @@ function renderMapCats(){
 }
 
 function addCatMarker(cat){
-  const colors=["#D4572A","#C9853A","#7B9EA6","#B85C38","#8B6CA6","#C0392B"];
-  const color=cat.color||colors[Math.abs(cat.name?.charCodeAt(0)||0)%colors.length];
+  const colors=["#D4572A","#C9853A","#7B9EA6","#B85C38","#8B6CA6","#C0392B","#2D6A4F","#E76F51"];
+  // Couleur basée sur l'ID pour être unique et stable
+  const idx = cat.id ? cat.id.charCodeAt(0) % colors.length : 0;
+  const color=cat.color||colors[idx];
   const el=document.createElement("button");
   el.className="cat-pin"+(cat.legend?" legend":"");
   el.innerHTML=cat.emoji||"🐱";
-  el.style.cssText=`background:#fff;border-color:${color};color:${color}`;
+  el.style.cssText=`background:#fff;border-color:${color};color:${color};border-width:2.5px`;
   el.addEventListener("click", e=>{e.stopPropagation(); openPopup({...cat,color});});
-  // MapLibre : coordonnées en [lng, lat], anchor center pour centrer le marqueur
-  const marker=new maplibregl.Marker({
-    element:el,
-    anchor:"center",
-    offset:[0,0]
-  })
+  const marker=new maplibregl.Marker({element:el,anchor:"center",offset:[0,0]})
     .setLngLat([cat.lng, cat.lat])
     .addTo(mapInstance);
   markers[cat.id]={marker,el,color};
@@ -1155,19 +1156,35 @@ function renderProfile(){
 }
 
 // ── MODAL ─────────────────────────────────────────────────────
+const CAT_EMOJIS = ["🐱","🐈","🐈‍⬛","🦊","🐯","👑","🤍","😸","😺","😻","🙀","😼","🐅","🦁","🐇","🦝"];
+let selectedEmoji = "🐱";
+
+function renderEmojiSelect(){
+  if(!$("emoji-select")) return;
+  $("emoji-select").innerHTML = CAT_EMOJIS.map(e=>
+    `<button onclick="selectEmoji('${e}')" style="width:40px;height:40px;border-radius:10px;border:2px solid ${selectedEmoji===e?"var(--terra)":"#E8E2DA"};background:${selectedEmoji===e?"rgba(212,87,42,0.12)":"#fff"};font-size:22px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .15s">${e}</button>`
+  ).join("");
+}
+
+function selectEmoji(e){ selectedEmoji=e; renderEmojiSelect(); }
+window.selectEmoji=selectEmoji;
+
 function openModal(){
   selectedChar=null;
+  selectedEmoji="🐱";
   $("input-name").value="";
   $("input-desc").value="";
   const old=$("photo-zone").querySelector(".photo-preview");
   if(old) old.remove();
   $("photo-zone").querySelector(".photo-zone-icon").style.display="";
   $("photo-zone").querySelector(".photo-zone-tip").style.display="";
+  renderEmojiSelect();
   renderCharSelect();
   $("modal-title").textContent=t().newSpot;
   $("photo-tip").textContent=t().photoTip;
   $("input-name").placeholder=t().catName;
   $("input-desc").placeholder=t().catDesc;
+  $("emoji-label").textContent=lang==="fr"?"Choisis un emoji":"Choose an emoji";
   $("char-label").textContent=t().charLabel;
   $("modal-cancel").textContent=t().cancel;
   $("modal-publish").textContent=t().publish;
@@ -1209,12 +1226,12 @@ async function publishSpot(){
     || (lang==="fr"?"Anonyme":"Anonymous");
 
   const saved=await saveCat({
-    name, emoji:"🐱", color, lat:newLat, lng:newLng,
+    name, emoji:selectedEmoji, color, lat:newLat, lng:newLng,
     char:selectedChar||"friendly", sightings:1, likes_count:0, legend:false, description:desc, posted_by
   });
 
   const cat=saved ? {...saved, likes:0, desc:saved.description} : {
-    id:"local-"+Date.now(), name, emoji:"🐱", color,
+    id:"local-"+Date.now(), name, emoji:selectedEmoji, color,
     lat:newLat, lng:newLng, sightings:1, likes_count:0, likes:0,
     created_at:new Date().toISOString(), desc, description:desc, char:selectedChar||"friendly", legend:false
   };
