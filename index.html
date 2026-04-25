@@ -858,10 +858,10 @@ function addDynamicHotspots(){
   if(!cats.length||!mapInstance.isStyleLoaded()) return;
   // Nettoyer anciens layers
   for(let i=0;i<5;i++){
-    if(mapInstance.getLayer("hs-"+i)) mapInstance.removeLayer("hs-"+i);
-    if(mapInstance.getSource("hs-"+i)) mapInstance.removeSource("hs-"+i);
+    try{ if(mapInstance.getLayer("hs-"+i)) mapInstance.removeLayer("hs-"+i); }catch(e){}
+    try{ if(mapInstance.getSource("hs-"+i)) mapInstance.removeSource("hs-"+i); }catch(e){}
   }
-  // Regrouper par proximité ~300m
+  // Regrouper par proximité ~800m (0.008 degrés)
   const clusters=[], used=new Set();
   cats.forEach((cat,i)=>{
     if(used.has(i)) return;
@@ -869,7 +869,7 @@ function addDynamicHotspots(){
     cats.forEach((o,j)=>{
       if(i===j||used.has(j)) return;
       const d=Math.sqrt(Math.pow(cat.lat-o.lat,2)+Math.pow(cat.lng-o.lng,2));
-      if(d<0.003){cluster.cats.push(o);used.add(j);}
+      if(d<0.008){cluster.cats.push(o);used.add(j);}
     });
     used.add(i);
     clusters.push(cluster);
@@ -877,15 +877,17 @@ function addDynamicHotspots(){
   clusters.sort((a,b)=>b.cats.length-a.cats.length);
   clusters.slice(0,5).forEach((cl,i)=>{
     const n=cl.cats.length;
-    const alpha=Math.min(n/5,1)*0.4; // Plus visible
-    const col=n>=4?`rgba(212,87,42,${alpha})`:n>=2?`rgba(201,133,58,${alpha})`:`rgba(123,158,166,${alpha})`;
+    // Couleur et opacité bien visibles
+    const col = n>=4?"rgba(212,87,42,0.35)":n>=2?"rgba(201,133,58,0.28)":"rgba(123,158,166,0.22)";
     try {
       mapInstance.addSource("hs-"+i,{type:"geojson",data:{type:"Feature",geometry:{type:"Point",coordinates:[cl.lng,cl.lat]}}});
       mapInstance.addLayer({id:"hs-"+i,type:"circle",source:"hs-"+i,paint:{
-        "circle-radius":["interpolate",["linear"],["zoom"],12,n*10,16,n*35],
-        "circle-color":col,"circle-blur":1,
+        "circle-radius":["interpolate",["linear"],["zoom"],11,n*20,14,n*60,17,n*120],
+        "circle-color":col,
+        "circle-blur":0.6,
+        "circle-opacity":1,
       }});
-    } catch(e){}
+    } catch(e){ console.warn("hotspot error",e); }
   });
 }
 
