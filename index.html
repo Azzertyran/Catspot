@@ -102,6 +102,7 @@ input:focus,textarea:focus{outline:none}
 /* FAB */
 #fab{position:fixed;bottom:calc(var(--nav) + 14px);left:50%;transform:translateX(-50%);width:56px;height:56px;border-radius:50%;background:linear-gradient(145deg,var(--terra),var(--amber));border:3px solid var(--light);box-shadow:0 4px 20px rgba(212,87,42,.55);z-index:40;display:flex;align-items:center;justify-content:center;font-size:24px;transition:transform .15s,box-shadow .15s}
 #fab:active{transform:translateX(-50%) scale(0.93)}
+#cat-popup.open ~ #fab, body.popup-open #fab{display:none!important}
 
 /* FEED */
 .feed-wrap{padding:12px 14px;display:flex;flex-direction:column;gap:14px}
@@ -297,7 +298,7 @@ input:focus,textarea:focus{outline:none}
             <!-- Actions -->
             <div style="display:flex;gap:8px;margin-top:12px">
               <button id="popup-respott-btn" style="flex:1;background:var(--terra);color:#fff;border:none;border-radius:12px;padding:10px;font-size:13px;font-weight:700;cursor:pointer;font-family:'DM Sans',sans-serif">🐾 Je l'ai vu !</button>
-              <button id="popup-comment-btn" style="flex:1;background:var(--warm);color:var(--dark);border:none;border-radius:12px;padding:10px;font-size:13px;font-weight:700;cursor:pointer;font-family:'DM Sans',sans-serif">💬</button>
+              <button id="popup-comment-btn" style="flex:1;background:var(--warm);color:var(--dark);border:none;border-radius:12px;padding:10px;font-size:12px;font-weight:700;cursor:pointer;font-family:'DM Sans',sans-serif">💬 Commenter</button>
               <button id="popup-report-btn" style="background:#fee2e2;color:#dc2626;border:none;border-radius:12px;padding:10px 14px;font-size:13px;cursor:pointer;font-family:'DM Sans',sans-serif">🚩</button>
             </div>
           </div>
@@ -475,8 +476,8 @@ const T = {
     sightings:n=>n+" signalement"+(n>1?"s":""),
     likes:"likes", yourPts:"Tes points", thisWeek:"Cette semaine",
     chSection:"Défis", badgesTitle:"Badges",
-    friendly:"Câlin", wild:"Sauvage", shy:"Timide", playful:"Joueur",
-    legend:"Légendaire ⭐",
+    friendly:"Câlin", wild:"Sauvage", shy:"Timide", playful:"Joueur", proud:"Fier", sleepy:"Endormi", grumpy:"Grognon", curious:"Curieux",
+    legend:"Légendaire ⭐", proud:"Fier", sleepy:"Endormi", grumpy:"Grognon", curious:"Curieux",
     streakDays:n=>n+" jour"+(n>1?"s":""), streakLbl:"Streak actif",
     proTitle:"Catspot Pro ⭐", proF1:"Stats avancées sur tes spots",
     proF2:"Badges exclusifs", proF3:"Carte en temps réel", proF4:"Mode sans pub",
@@ -515,8 +516,8 @@ const T = {
     sightings:n=>n+" sighting"+(n>1?"s":""),
     likes:"likes", yourPts:"Your points", thisWeek:"This week",
     chSection:"Challenges", badgesTitle:"Badges",
-    friendly:"Friendly", wild:"Wild", shy:"Shy", playful:"Playful",
-    legend:"Legendary ⭐",
+    friendly:"Friendly", wild:"Wild", shy:"Shy", playful:"Playful", proud:"Proud", sleepy:"Sleepy", grumpy:"Grumpy", curious:"Curious",
+    legend:"Legendary ⭐", proud:"Proud", sleepy:"Sleepy", grumpy:"Grumpy", curious:"Curious",
     streakDays:n=>n+" day"+(n>1?"s":""), streakLbl:"Active streak",
     proTitle:"Catspot Pro ⭐", proF1:"Advanced stats on your spots",
     proF2:"Exclusive badges", proF3:"Real-time map", proF4:"Ad-free mode",
@@ -960,10 +961,12 @@ function openPopup(cat){
   const poster = cat.posted_by || (lang==="fr"?"Anonyme":"Anonymous");
   $("popup-name").textContent=cat.name||"Chat inconnu";
   $("popup-meta").textContent="Par "+poster+" · "+t().sightings(cat.sightings||1)+" · "+fmtAgo(cat.created_at||new Date().toISOString());
-  // Bouton admin delete
+  // Bouton admin/owner delete
   const existingAdminBtn = $("popup-admin-btn");
   if(existingAdminBtn) existingAdminBtn.remove();
-  if(isAdmin()){
+  const myName=currentUser?.user_metadata?.full_name||currentUser?.email?.split("@")[0]||"";
+  const isOwnerPopup=currentUser&&cat.posted_by===myName;
+  if(isAdmin()||isOwnerPopup){
     const btn = document.createElement("button");
     btn.id = "popup-admin-btn";
     btn.style.cssText = "background:#fee2e2;border:none;border-radius:8px;padding:6px 12px;font-size:12px;font-weight:700;color:#dc2626;cursor:pointer;margin-top:10px;font-family:'DM Sans',sans-serif;width:100%";
@@ -974,7 +977,7 @@ function openPopup(cat){
   $("popup-desc").textContent=cat.desc||"";
   $("popup-desc").style.display=cat.desc?"block":"none";
   const tagsEl=$("popup-tags"); tagsEl.innerHTML="";
-  const charMap={friendly:t().friendly,wild:t().wild,shy:t().shy,playful:t().playful};
+  const charMap={friendly:t().friendly,wild:t().wild,shy:t().shy,playful:t().playful,proud:t().proud||"Fier",sleepy:t().sleepy||"Endormi",grumpy:t().grumpy||"Grognon",curious:t().curious||"Curieux"};
   if(cat.char) tagsEl.innerHTML+=`<span class='popup-tag'>${charMap[cat.char]}</span>`;
   if(cat.legend) tagsEl.innerHTML+=`<span class='popup-tag legend'>⭐ ${t().legend}</span>`;
   updatePopupLike(cat);
@@ -993,6 +996,7 @@ function openPopup(cat){
   }
 
   $("cat-popup").classList.add("open");
+  $("fab").style.display="none";
   mapInstance.flyTo({center:[cat.lng, cat.lat], offset:[0,80], duration:400});
 }
 
@@ -1005,12 +1009,51 @@ function updatePopupLike(cat){
 function closePopup(){
   selectedCat=null;
   $("cat-popup").classList.remove("open");
+  $("fab").style.display="flex";
   Object.values(markers).forEach(({el,color})=>{
     el.classList.remove("selected");
     el.style.background="#fff";
     if(color){el.style.color=color; el.style.borderColor=color;}
   });
 }
+
+
+// ── EDIT CAT ──────────────────────────────────────────────────
+function editCat(catId){
+  const cat=cats.find(c=>c.id===catId);
+  if(!cat) return;
+  const modal=document.createElement("div");
+  modal.id="edit-cat-modal";
+  modal.style.cssText="position:fixed;inset:0;background:rgba(28,25,21,.65);z-index:300;display:flex;align-items:center;justify-content:center;padding:20px;backdrop-filter:blur(4px)";
+  modal.innerHTML=`<div style="background:var(--light);border-radius:20px;padding:24px;width:100%;max-width:380px">
+    <div style="font-family:'Fraunces',serif;font-size:18px;font-weight:700;margin-bottom:16px">✏️ ${lang==="fr"?"Modifier le chat":"Edit cat"}</div>
+    <input id="edit-name" value="${cat.name||""}" placeholder="${lang==="fr"?"Nom du chat":"Cat name"}" style="width:100%;border:1.5px solid #E8E2DA;border-radius:12px;padding:11px 14px;font-size:14px;margin-bottom:10px;font-family:'DM Sans',sans-serif;box-sizing:border-box"/>
+    <input id="edit-desc" value="${cat.desc||cat.description||""}" placeholder="${lang==="fr"?"Une anecdote ?":"An anecdote?"}" style="width:100%;border:1.5px solid #E8E2DA;border-radius:12px;padding:11px 14px;font-size:14px;margin-bottom:16px;font-family:'DM Sans',sans-serif;box-sizing:border-box"/>
+    <div style="display:flex;gap:8px">
+      <button onclick="document.getElementById('edit-cat-modal').remove()" style="flex:1;padding:12px;border:1.5px solid #E8E2DA;border-radius:12px;background:#fff;font-size:14px;font-weight:700;color:var(--muted);cursor:pointer">${lang==="fr"?"Annuler":"Cancel"}</button>
+      <button onclick="saveEditCat('${catId}')" style="flex:1;padding:12px;border:none;border-radius:12px;background:var(--terra);font-size:14px;font-weight:700;color:#fff;cursor:pointer">${lang==="fr"?"Enregistrer":"Save"}</button>
+    </div>
+  </div>`;
+  modal.addEventListener("click",e=>{if(e.target===modal)modal.remove();});
+  document.body.appendChild(modal);
+}
+window.editCat=editCat;
+
+async function saveEditCat(catId){
+  const name=document.getElementById("edit-name")?.value.trim();
+  const desc=document.getElementById("edit-desc")?.value.trim()||null;
+  if(!name){ showToast("❌ "+(lang==="fr"?"Nom requis":"Name required")); return; }
+  if(containsBadWord(name)||containsBadWord(desc)){ showToast("🚫 "+(lang==="fr"?"Contenu inapproprié":"Inappropriate content")); return; }
+  try {
+    await sb.from("cats").update({name,description:desc}).eq("id",catId);
+    const cat=cats.find(c=>c.id===catId);
+    if(cat){ cat.name=name; cat.desc=desc; cat.description=desc; }
+    document.getElementById("edit-cat-modal")?.remove();
+    renderFeed();
+    showToast("✅ "+(lang==="fr"?"Chat modifié !":"Cat updated!"));
+  } catch(e){ showToast("❌ Erreur"); }
+}
+window.saveEditCat=saveEditCat;
 
 // ── ADMIN ─────────────────────────────────────────────────────
 async function deleteCat(id){
@@ -1270,15 +1313,19 @@ function renderFeed(append=false){
         `<span class='feed-photo-emoji' style="display:none">${cat.emoji||"🐱"}</span>`
       :`<span class='feed-photo-emoji'>${cat.emoji||"🐱"}</span>`;
     const poster = cat.posted_by || (lang==="fr"?"Anonyme":"Anonymous");
-    const adminBtn = isAdmin() ? `<button onclick="deleteCat('${cat.id}')" style="margin-left:auto;background:#fee2e2;border:none;border-radius:8px;padding:4px 10px;font-size:11px;font-weight:700;color:#dc2626;cursor:pointer;font-family:'DM Sans',sans-serif">🗑️</button>` : '<span class="feed-pin">📍</span>';
+    const myName=currentUser?.user_metadata?.full_name||currentUser?.email?.split("@")[0]||"";
+    const isOwner=currentUser&&poster===myName;
+    const ownerBtns=isOwner?`<button onclick="editCat('${cat.id}')" style="background:var(--warm);border:none;border-radius:8px;padding:4px 8px;font-size:11px;font-weight:700;color:var(--mid);cursor:pointer;font-family:'DM Sans',sans-serif">✏️</button>
+      <button onclick="deleteCat('${cat.id}')" style="background:#fee2e2;border:none;border-radius:8px;padding:4px 8px;font-size:11px;font-weight:700;color:#dc2626;cursor:pointer;font-family:'DM Sans',sans-serif">🗑️</button>`:"";
+    const adminBtn=isAdmin()&&!isOwner?`<button onclick="deleteCat('${cat.id}')" style="margin-left:auto;background:#fee2e2;border:none;border-radius:8px;padding:4px 10px;font-size:11px;font-weight:700;color:#dc2626;cursor:pointer;font-family:'DM Sans',sans-serif">🗑️</button>`:"";
     return `<div class='feed-card'>
       <div class='feed-head'>
         <div class='feed-avatar' style='background:${color}22;border-color:${color}'>${cat.emoji||"🐱"}</div>
-        <div>
+        <div style="flex:1;min-width:0">
           <div class='feed-catname serif'>${cat.name||"Chat inconnu"}</div>
           <div class='feed-meta'>Par <strong style="cursor:pointer;text-decoration:underline;color:var(--terra)" onclick="showUserProfile('${poster}')">${poster}</strong> · ${fmtAgo(cat.created_at||new Date().toISOString())} · ${t().sightings(cat.sightings||1)}</div>
         </div>
-        ${adminBtn}
+        <div style="display:flex;gap:4px;align-items:center;flex-shrink:0">${ownerBtns}${adminBtn}</div>
       </div>
       <div class='feed-photo' style='background:linear-gradient(135deg,${color}18,${color}42)'>${photoHtml}<div class='feed-photo-loc'>📍 Catspot</div></div>
       ${cat.desc?`<p class='feed-desc'>"${cat.desc}"</p>`:""}
@@ -1286,7 +1333,7 @@ function renderFeed(append=false){
         <button class='feed-like-btn' id='fl-${cat.id}' onclick='toggleFeedLike("${cat.id}")' style='color:${isLiked?"#D4572A":"#8A7F72"}'>
           ${isLiked?"❤️":"🤍"} ${(cat.likes_count||0)+(isLiked?1:0)} ${t().likes}
         </button>
-        <span class='feed-sightings'>🐾 ${t().sightings(cat.sightings||1)}</span>
+        <button onclick="showComments('${cat.id}')" style="background:none;border:none;font-size:13px;color:var(--muted);cursor:pointer;font-family:'DM Sans',sans-serif;font-weight:600;display:flex;align-items:center;gap:4px">💬 Commenter</button>
       </div>
     </div>`;
   }).join("");
@@ -1450,7 +1497,7 @@ function openModal(){
 }
 
 function renderCharSelect(){
-  $("char-select").innerHTML=["friendly","wild","shy","playful"].map(c=>
+  $("char-select").innerHTML=["friendly","wild","shy","playful","proud","sleepy","grumpy","curious"].map(c=>
     "<button class='char-btn"+(selectedChar===c?" selected":"")+"' onclick='selectChar(\""+c+"\")'>"+(t()[c]||c)+"</button>"
   ).join("");
 }
@@ -1733,9 +1780,9 @@ $("popup-like-btn").addEventListener("click",async ()=>{
   if(btn&&cat){btn.innerHTML=(likes[id]?"❤️":"🤍")+" "+(cat.likes_count||0)+" "+t().likes;btn.style.color=likes[id]?"#D4572A":"#8A7F72";}
   await toggleLikeDB(id, wasLiked);
 });
-$("popup-respott-btn").addEventListener("click",()=>{ if(selectedCat) reSpot(selectedCat.id); });
-$("popup-comment-btn").addEventListener("click",()=>{ if(selectedCat) showComments(selectedCat.id); });
-$("popup-report-btn").addEventListener("click",()=>{ if(selectedCat) reportCat(selectedCat.id); });
+$("popup-respott-btn").addEventListener("click",(e)=>{ e.stopPropagation(); if(selectedCat) reSpot(selectedCat.id); });
+$("popup-comment-btn").addEventListener("click",(e)=>{ e.stopPropagation(); if(selectedCat) showComments(selectedCat.id); });
+$("popup-report-btn").addEventListener("click",(e)=>{ e.stopPropagation(); if(selectedCat) reportCat(selectedCat.id); });
 document.querySelectorAll(".nav-btn").forEach(b=>b.addEventListener("click",()=>switchTab(b.dataset.tab)));
 $("pro-btn").addEventListener("click",()=>showToast("🚀 Bientôt disponible !"));
 
