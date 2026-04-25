@@ -354,6 +354,7 @@ input:focus,textarea:focus{outline:none}
         <div class="profile-avatar" id="profile-avatar" onclick="showMyProfile()" style="cursor:pointer" title="Voir mon profil">🐱</div>
         <div class="profile-name serif" id="profile-name">CatSpotter</div>
         <div class="profile-level" id="profile-level">Niveau 1 · Novice</div>
+        <button id="edit-pseudo-btn" onclick="editPseudo()" style="display:none;margin-top:6px;background:rgba(255,255,255,0.18);border:1.5px solid rgba(255,255,255,0.35);border-radius:20px;padding:4px 14px;font-size:12px;font-weight:700;color:#fff;cursor:pointer;font-family:'DM Sans',sans-serif">✏️ Modifier le pseudo</button>
       </div>
       <div class="stats-row">
         <div class="stat-box"><div class="stat-num serif" id="stat-cats">0</div><div class="stat-lbl" id="stat-cats-lbl">Chats</div></div>
@@ -907,10 +908,8 @@ function addCatMarker(cat){
   const size  = getCatPinSize(cat);
   const el = document.createElement("button");
   el.className = "cat-pin" + (cat.legend ? " legend" : "");
-  el.style.cssText = `--pin-color:${color};width:${size}px;height:${size}px;border-radius:50%;background:${color};border:2.5px solid #fff;box-shadow:0 3px 10px rgba(0,0,0,0.22);display:flex;align-items:center;justify-content:center;font-size:${Math.round(size*0.52)}px;cursor:pointer;padding:0;line-height:1;position:relative;transition:transform .15s`;
+  el.style.cssText = `--pin-color:${color};width:${size}px;height:${size}px;border-radius:50%;background:${color};border:2.5px solid #fff;box-shadow:0 3px 10px rgba(0,0,0,0.22);display:flex;align-items:center;justify-content:center;font-size:${Math.round(size*0.52)}px;cursor:pointer;padding:0;line-height:1;position:relative`;
   el.textContent = "🐱";
-  el.addEventListener("mouseenter", ()=>{ el.style.transform="scale(1.2)"; });
-  el.addEventListener("mouseleave", ()=>{ el.style.transform=el.classList.contains("selected")?"scale(1.1)":"scale(1)"; });
   el.addEventListener("click", e=>{e.stopPropagation(); openPopup({...cat,color});});
   const marker = new maplibregl.Marker({element:el, anchor:"center", offset:[0,0]})
     .setLngLat([cat.lng, cat.lat])
@@ -1033,7 +1032,7 @@ function openPopup(cat){
 
   $("cat-popup").classList.add("open");
   $("fab").style.display="none";
-  mapInstance.flyTo({center:[cat.lng, cat.lat], offset:[0,80], duration:400});
+  mapInstance.flyTo({center:[cat.lng, cat.lat], duration:400});
 }
 
 function updatePopupLike(cat){
@@ -1499,7 +1498,48 @@ function renderProfile(){
   $("support-desc").textContent=t().supportDesc;
   $("profile-badges-title").textContent=t().profileBadges;
   renderBadges("profile-badges-grid");
+  // Afficher bouton pseudo si connecté
+  const editBtn = $("edit-pseudo-btn");
+  if(editBtn) editBtn.style.display = currentUser && !currentUser.is_anonymous ? "inline-block" : "none";
 }
+
+function editPseudo(){
+  if(!currentUser) return;
+  const current = currentUser.user_metadata?.full_name || currentUser.email?.split("@")[0] || "";
+  document.getElementById("pseudo-modal")?.remove();
+  const modal = document.createElement("div");
+  modal.id = "pseudo-modal";
+  modal.style.cssText = "position:fixed;inset:0;background:rgba(28,25,21,.65);z-index:300;display:flex;align-items:center;justify-content:center;padding:20px;backdrop-filter:blur(4px)";
+  modal.innerHTML = `<div style="background:var(--light);border-radius:20px;padding:24px;width:100%;max-width:360px">
+    <div style="font-family:'Fraunces',serif;font-size:18px;font-weight:700;margin-bottom:6px">✏️ Mon pseudo</div>
+    <div style="font-size:12px;color:var(--muted);margin-bottom:16px">Ce nom apparaît sur tes spots et commentaires.</div>
+    <input id="pseudo-input" value="${current}" maxlength="30" placeholder="Ton pseudo..." style="width:100%;border:1.5px solid #E8E2DA;border-radius:12px;padding:12px 14px;font-size:15px;font-family:'DM Sans',sans-serif;box-sizing:border-box;outline:none"/>
+    <div style="font-size:11px;color:var(--muted);margin-top:6px;margin-bottom:16px">30 caractères max</div>
+    <div style="display:flex;gap:8px">
+      <button onclick="document.getElementById('pseudo-modal').remove()" style="flex:1;padding:12px;border:1.5px solid #E8E2DA;border-radius:12px;background:#fff;font-size:14px;font-weight:700;color:var(--muted);cursor:pointer;font-family:'DM Sans',sans-serif">Annuler</button>
+      <button onclick="savePseudo()" style="flex:1;padding:12px;border:none;border-radius:12px;background:var(--terra);font-size:14px;font-weight:700;color:#fff;cursor:pointer;font-family:'DM Sans',sans-serif">Enregistrer</button>
+    </div>
+  </div>`;
+  modal.addEventListener("click", e=>{ if(e.target===modal) modal.remove(); });
+  document.body.appendChild(modal);
+  setTimeout(()=>{ const inp=$("pseudo-input"); if(inp){inp.focus();inp.select();} }, 100);
+}
+window.editPseudo = editPseudo;
+
+async function savePseudo(){
+  const inp = $("pseudo-input");
+  const newName = inp?.value.trim();
+  if(!newName || newName.length<2){ showToast("❌ Pseudo trop court"); return; }
+  if(containsBadWord(newName)){ showToast("🚫 Pseudo inapproprié"); return; }
+  try {
+    await sb.auth.updateUser({ data:{ full_name: newName } });
+    currentUser.user_metadata = {...(currentUser.user_metadata||{}), full_name: newName};
+    $("profile-name").textContent = newName;
+    document.getElementById("pseudo-modal")?.remove();
+    showToast("✅ Pseudo mis à jour !");
+  } catch(e){ showToast("❌ Erreur"); }
+}
+window.savePseudo = savePseudo;
 
 // ── MODAL ─────────────────────────────────────────────────────
 const CAT_EMOJIS = ["🐱","🐈","🐈‍⬛","🦊","🐯","👑","🤍","😸","😺","😻","🙀","😼","🐅","🦁","🐇","🦝"];
