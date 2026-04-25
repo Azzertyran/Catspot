@@ -385,8 +385,7 @@ input:focus,textarea:focus{outline:none}
           <div style="font-size:12px;color:var(--muted)">Une app créée par</div>
           <div style="font-size:14px;font-weight:700;color:var(--dark);margin-top:2px">Philippe Auger</div>
           <a href="mailto:pilipog49@gmail.com" style="font-size:12px;color:var(--terra);text-decoration:none">pilipog49@gmail.com</a>
-          <div style="font-size:11px;color:#ccc;margin-top:6px">Catspot v1.0 🐾</div>
-        </div>
+          <div style="font-size:11px;color:#ccc;margin-top:6px">Catspot v1.0 🐾</div>        </div>
 
       </div>
     </div>
@@ -1015,25 +1014,25 @@ function showUserProfile(poster){
   const cards = userCats.map(cat=>{
     const color=cat.color||colors[0];
     const photoHtml=cat.photo_url
-      ?`<img src="${cat.photo_url}" style="width:100%;height:160px;object-fit:contain;background:#111;display:block;border-radius:12px">`
-      :`<div style="height:100px;background:linear-gradient(135deg,${color}22,${color}44);border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:48px">${cat.emoji||"🐱"}</div>`;
+      ?`<div style="width:100%;height:140px;overflow:hidden;background:#f5f0e8"><img src="${cat.photo_url}" style="width:100%;height:140px;object-fit:cover;display:block"></div>`
+      :`<div style="height:140px;background:linear-gradient(135deg,${color}22,${color}44);display:flex;align-items:center;justify-content:center;font-size:48px">${cat.emoji||"🐱"}</div>`;
     return `<div style="background:#fff;border-radius:14px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.08)">
       ${photoHtml}
       <div style="padding:10px 12px">
-        <div style="font-family:'Fraunces',serif;font-size:15px;font-weight:700">${cat.name||"Chat inconnu"}</div>
+        <div style="font-family:'Fraunces',serif;font-size:14px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${cat.name||"Chat inconnu"}</div>
         <div style="font-size:11px;color:var(--muted);margin-top:2px">${fmtAgo(cat.created_at||new Date().toISOString())}</div>
       </div>
     </div>`;
   }).join("");
-  modal.innerHTML = `<div style="background:var(--light);border-radius:22px 22px 0 0;width:100%;max-height:85vh;overflow-y:auto;padding:8px 18px 32px">
+  modal.innerHTML = `<div style="background:var(--light);border-radius:22px 22px 0 0;width:100%;max-width:430px;margin:0 auto;max-height:85vh;overflow-y:auto;padding:8px 18px 32px">
     <div style="width:36px;height:4px;background:#ddd;border-radius:2px;margin:10px auto 16px"></div>
     <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px">
-      <div style="width:52px;height:52px;border-radius:50%;background:linear-gradient(135deg,var(--terra),var(--amber));display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:700;color:#fff">${poster.charAt(0).toUpperCase()}</div>
+      <div style="width:48px;height:48px;border-radius:50%;background:linear-gradient(135deg,var(--terra),var(--amber));display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:700;color:#fff;flex-shrink:0">${poster.charAt(0).toUpperCase()}</div>
       <div>
-        <div style="font-family:'Fraunces',serif;font-size:18px;font-weight:700">${poster}</div>
+        <div style="font-family:'Fraunces',serif;font-size:17px;font-weight:700">${poster}</div>
         <div style="font-size:12px;color:var(--muted)">${userCats.length} chat${userCats.length>1?"s":""} spotté${userCats.length>1?"s":""}</div>
       </div>
-      <button onclick="document.getElementById('user-profile-modal').remove()" style="margin-left:auto;background:var(--warm);border:none;border-radius:50%;width:32px;height:32px;font-size:16px;cursor:pointer">×</button>
+      <button onclick="document.getElementById('user-profile-modal').remove()" style="margin-left:auto;background:var(--warm);border:none;border-radius:50%;width:32px;height:32px;font-size:18px;cursor:pointer;flex-shrink:0">×</button>
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">${cards||`<div style="color:var(--muted);font-size:13px;grid-column:1/-1;text-align:center;padding:20px">Aucun chat posté</div>`}</div>
   </div>`;
