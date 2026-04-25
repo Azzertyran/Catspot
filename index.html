@@ -906,13 +906,14 @@ function getCatPinSize(cat){
 function addCatMarker(cat){
   const color = getCatPinColor(cat);
   const size  = getCatPinSize(cat);
-  // Élément racine : RIEN dessus — MapLibre utilise transform sur cet élément
+  // Wrapper 0x0 — MapLibre ne touche QUE ce noeud pour transform
   const el = document.createElement("div");
   el.className = "cat-pin" + (cat.legend ? " legend" : "");
-  el.style.cssText = `--pin-color:${color};width:${size}px;height:${size}px;cursor:pointer;position:relative`;
-  // Enfant : tout le style visuel isolé ici
+  el.style.cssText = "width:0;height:0;position:relative;cursor:pointer";
+  // Inner centré via position absolue — isolé du transform MapLibre
   const inner = document.createElement("div");
-  inner.style.cssText = `width:${size}px;height:${size}px;border-radius:50%;background:${color};border:2.5px solid #fff;box-shadow:0 3px 10px rgba(0,0,0,0.22);display:flex;align-items:center;justify-content:center;font-size:${Math.round(size*0.52)}px;line-height:1;pointer-events:none;user-select:none`;
+  const half = Math.round(size/2);
+  inner.style.cssText = `position:absolute;top:-${half}px;left:-${half}px;width:${size}px;height:${size}px;border-radius:50%;background:${color};border:2.5px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,0.25);display:flex;align-items:center;justify-content:center;font-size:${Math.round(size*0.52)}px;line-height:1;user-select:none;pointer-events:none`;
   inner.textContent = "🐱";
   el.appendChild(inner);
   el.addEventListener("click", e=>{e.stopPropagation(); openPopup({...cat,color});});
@@ -1391,7 +1392,7 @@ function renderFeed(append=false){
       ${cat.desc?`<p class='feed-desc'>"${cat.desc}"</p>`:""}
       <div class='feed-actions'>
         <button class='feed-like-btn' id='fl-${cat.id}' onclick='toggleFeedLike("${cat.id}")' style='color:${isLiked?"#D4572A":"#8A7F72"}'>
-          ${isLiked?"❤️":"🤍"} ${(cat.likes_count||0)+(isLiked?1:0)} ${t().likes}
+          ${isLiked?"❤️":"🤍"} ${cat.likes_count||0} ${t().likes}
         </button>
         <button onclick="showComments('${cat.id}')" style="background:none;border:none;font-size:13px;color:${(commentCounts[cat.id]||0)>0?"var(--terra)":"var(--muted)"};cursor:pointer;font-family:'DM Sans',sans-serif;font-weight:600;display:flex;align-items:center;gap:4px">
           💬 ${(commentCounts[cat.id]||0)>0 ? commentCounts[cat.id]+" commentaire"+(commentCounts[cat.id]>1?"s":"") : (lang==="fr"?"Commenter":"Comment")}
