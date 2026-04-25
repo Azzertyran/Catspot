@@ -1,5 +1,5 @@
-const CACHE = "catspot-v1";
-const ASSETS = ["/", "/index.html"];
+const CACHE = "catspot-v3";
+const ASSETS = ["/", "/index.html", "/manifest.json", "/icon-192.png", "/icon-512.png", "/apple-touch-icon.png", "/favicon.png"];
 
 self.addEventListener("install", e => {
   e.waitUntil(
@@ -18,7 +18,6 @@ self.addEventListener("activate", e => {
 });
 
 self.addEventListener("fetch", e => {
-  // Ne pas intercepter les requêtes Supabase ou externes
   if (!e.request.url.startsWith(self.location.origin)) return;
   e.respondWith(
     fetch(e.request)
