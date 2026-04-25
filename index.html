@@ -125,6 +125,8 @@ input:focus,textarea:focus{outline:none}
 .feed-actions{display:flex;align-items:center;justify-content:space-between;padding:10px 14px 13px;border-top:1px solid #f5f3f0;margin-top:10px}
 .feed-like-btn{display:flex;align-items:center;gap:5px;font-size:14px;font-weight:700}
 .feed-sightings{font-size:12px;color:var(--muted)}
+.feed-filter-btn{background:var(--warm);border:none;border-radius:20px;padding:6px 14px;font-size:12px;font-weight:700;color:var(--mid);cursor:pointer;font-family:'DM Sans',sans-serif;transition:all .2s}
+.feed-filter-btn.active{background:var(--terra);color:#fff}
 
 /* CHALLENGES */
 .tab-wrap{padding:14px;display:flex;flex-direction:column;gap:14px}
@@ -292,6 +294,11 @@ input:focus,textarea:focus{outline:none}
             <!-- Photo du chat — visible si disponible -->
             <div class="popup-photo" id="popup-photo"></div>
             <div class="popup-expand-hint" id="popup-expand-hint"></div>
+            <!-- Actions -->
+            <div style="display:flex;gap:8px;margin-top:12px">
+              <button id="popup-respott-btn" style="flex:1;background:var(--terra);color:#fff;border:none;border-radius:12px;padding:10px;font-size:13px;font-weight:700;cursor:pointer;font-family:'DM Sans',sans-serif">🐾 Je l'ai vu !</button>
+              <button id="popup-report-btn" style="background:var(--warm);color:var(--mid);border:none;border-radius:12px;padding:10px 14px;font-size:13px;cursor:pointer;font-family:'DM Sans',sans-serif">🚩</button>
+            </div>
           </div>
         </div>
       </div>
@@ -300,6 +307,14 @@ input:focus,textarea:focus{outline:none}
 
     <!-- FEED -->
     <div id="tab-feed" class="tab-panel">
+      <!-- Header feed avec filtres -->
+      <div style="position:sticky;top:0;z-index:5;background:var(--light);padding:10px 14px 8px;border-bottom:1px solid #f0ece6;display:flex;align-items:center;justify-content:space-between">
+        <div style="display:flex;gap:6px">
+          <button id="feed-filter-global" class="feed-filter-btn active" onclick="setFeedFilter('global')">🌍 Global</button>
+          <button id="feed-filter-nearby" class="feed-filter-btn" onclick="setFeedFilter('nearby')">📍 Près de moi</button>
+        </div>
+        <button onclick="refreshFeed()" style="background:var(--warm);border:none;border-radius:20px;padding:6px 12px;font-size:12px;font-weight:700;color:var(--mid);cursor:pointer;font-family:'DM Sans',sans-serif">↻ Refresh</button>
+      </div>
       <div class="feed-wrap" id="feed-list"></div>
     </div>
 
@@ -324,7 +339,7 @@ input:focus,textarea:focus{outline:none}
     <!-- PROFILE -->
     <div id="tab-profile" class="tab-panel">
       <div class="profile-hero">
-        <div class="profile-avatar" id="profile-avatar">🐱</div>
+        <div class="profile-avatar" id="profile-avatar" onclick="showMyProfile()" style="cursor:pointer" title="Voir mon profil">🐱</div>
         <div class="profile-name serif" id="profile-name">CatSpotter</div>
         <div class="profile-level" id="profile-level">Niveau 1 · Novice</div>
       </div>
@@ -1040,7 +1055,111 @@ function showUserProfile(poster){
   document.body.appendChild(modal);
 }
 window.showUserProfile = showUserProfile;
-let feedPage = 0;
+
+// ── FILTRE FEED ───────────────────────────────────────────────
+let feedFilter = "global";
+
+function setFeedFilter(filter){
+  feedFilter = filter;
+  const gb=$("feed-filter-global"), nb=$("feed-filter-nearby");
+  if(gb) gb.classList.toggle("active", filter==="global");
+  if(nb) nb.classList.toggle("active", filter==="nearby");
+  renderFeed();
+}
+window.setFeedFilter = setFeedFilter;
+
+async function refreshFeed(){
+  const btn = document.querySelector("[onclick=\"refreshFeed()\"]");
+  if(btn) btn.textContent = "↻ ...";
+  await loadCats();
+  renderFeed();
+  if(btn) btn.textContent = "↻ Refresh";
+  showToast("🔄 "+(lang==="fr"?"Feed mis à jour":"Feed refreshed"));
+}
+window.refreshFeed = refreshFeed;
+
+function getFilteredCats(){
+  if(feedFilter==="nearby" && userLat && userLng){
+    return cats.filter(cat=>{
+      const dlat=cat.lat-userLat, dlng=cat.lng-userLng;
+      return Math.sqrt(dlat*dlat+dlng*dlng)*111 <= 5; // 5km
+    });
+  }
+  return cats;
+}
+
+// ── RE-SPOTTER ────────────────────────────────────────────────
+async function reSpot(catId){
+  const cat=cats.find(c=>c.id===catId);
+  if(!cat) return;
+  try {
+    await sb.from("cats").update({sightings:(cat.sightings||1)+1}).eq("id",catId);
+    cat.sightings=(cat.sightings||1)+1;
+    const poster=cat.posted_by||(lang==="fr"?"Anonyme":"Anonymous");
+    $("popup-meta").textContent="Par "+poster+" · "+t().sightings(cat.sightings)+" · "+fmtAgo(cat.created_at||new Date().toISOString());
+    showToast("🐾 "+(lang==="fr"?"Signalement ajouté !":"Sighting added!"));
+    if(currentTab==="feed") renderFeed();
+  } catch(e){ showToast("❌ Erreur"); }
+}
+window.reSpot = reSpot;
+
+// ── SIGNALEMENT ───────────────────────────────────────────────
+function reportCat(catId){
+  const cat=cats.find(c=>c.id===catId);
+  if(!cat) return;
+  const subject=encodeURIComponent(`[Catspot] Signalement : ${cat.name||"Chat"} (${catId})`);
+  const body=encodeURIComponent(`Bonjour Philippe,\n\nSignalement d'un contenu :\n\nNom : ${cat.name||"Inconnu"}\nID : ${catId}\nPosté par : ${cat.posted_by||"Anonyme"}\n\nMotif : [à préciser]\n\nMerci.`);
+  window.open(`mailto:pilipog49@gmail.com?subject=${subject}&body=${body}`);
+  showToast("📧 "+(lang==="fr"?"Signalement envoyé !":"Report sent!"));
+}
+window.reportCat = reportCat;
+
+// ── FILTRAGE INSULTES ─────────────────────────────────────────
+const BAD_WORDS=["merde","putain","connard","connasse","salope","enculé","pute","bite","niquer","nique","baise","con","conne","fdp","ntm","pd","fuck","shit","bitch","asshole","bastard","cunt","dick","cock","pussy","whore","faggot","retard","kys"];
+function containsBadWord(text){
+  if(!text) return false;
+  const lower=text.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"");
+  return BAD_WORDS.some(w=>lower.includes(w));
+}
+
+// ── MON PROFIL ────────────────────────────────────────────────
+function showMyProfile(){
+  if(!currentUser) return;
+  const myName=currentUser.user_metadata?.full_name||currentUser.email?.split("@")[0]||"";
+  const myCats=cats.filter(c=>c.posted_by===myName);
+  const myLikes=myCats.reduce((a,c)=>a+(c.likes_count||0),0);
+  const colors=["#D4572A","#C9853A","#7B9EA6","#B85C38","#8B6CA6"];
+  const modal=document.createElement("div");
+  modal.id="my-profile-modal";
+  modal.style.cssText="position:fixed;inset:0;background:rgba(28,25,21,.65);z-index:200;display:flex;align-items:flex-end;backdrop-filter:blur(4px)";
+  const cards=myCats.map(cat=>{
+    const color=cat.color||colors[0];
+    const ph=cat.photo_url
+      ?`<div style="width:100%;height:120px;overflow:hidden"><img src="${cat.photo_url}" style="width:100%;height:120px;object-fit:cover;display:block"></div>`
+      :`<div style="height:120px;background:linear-gradient(135deg,${color}22,${color}44);display:flex;align-items:center;justify-content:center;font-size:40px">${cat.emoji||"🐱"}</div>`;
+    return `<div style="background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.08)">${ph}<div style="padding:8px 10px"><div style="font-family:'Fraunces',serif;font-size:13px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${cat.name||"Chat inconnu"}</div><div style="font-size:11px;color:var(--muted);margin-top:1px">❤️ ${cat.likes_count||0} · ${fmtAgo(cat.created_at||new Date().toISOString())}</div></div></div>`;
+  }).join("");
+  const av=currentUser.user_metadata?.avatar_url;
+  modal.innerHTML=`<div style="background:var(--light);border-radius:22px 22px 0 0;width:100%;max-width:430px;margin:0 auto;max-height:90vh;overflow-y:auto">
+    <div style="background:var(--dark);padding:24px 18px 20px;border-radius:22px 22px 0 0;text-align:center;position:relative">
+      <button onclick="document.getElementById('my-profile-modal').remove()" style="position:absolute;top:12px;right:12px;background:rgba(255,255,255,.15);border:none;border-radius:50%;width:30px;height:30px;color:#fff;font-size:16px;cursor:pointer">×</button>
+      <div style="width:64px;height:64px;border-radius:50%;margin:0 auto 10px;overflow:hidden;border:3px solid var(--terra)">${av?`<img src="${av}" style="width:100%;height:100%;object-fit:cover">`:`<div style="width:100%;height:100%;background:linear-gradient(135deg,var(--terra),var(--amber));display:flex;align-items:center;justify-content:center;font-size:28px">🐱</div>`}</div>
+      <div style="font-family:'Fraunces',serif;font-size:20px;font-weight:700;color:#fff">${myName}</div>
+      <div style="display:flex;justify-content:center;gap:24px;margin-top:14px">
+        <div style="text-align:center"><div style="font-family:'Fraunces',serif;font-size:22px;font-weight:900;color:#fff">${myCats.length}</div><div style="font-size:11px;color:rgba(255,255,255,.5);text-transform:uppercase;letter-spacing:.5px">Chats</div></div>
+        <div style="text-align:center"><div style="font-family:'Fraunces',serif;font-size:22px;font-weight:900;color:#fff">${myLikes}</div><div style="font-size:11px;color:rgba(255,255,255,.5);text-transform:uppercase;letter-spacing:.5px">Likes</div></div>
+        <div style="text-align:center"><div style="font-family:'Fraunces',serif;font-size:22px;font-weight:900;color:#fff">${userProfile.streak||0}</div><div style="font-size:11px;color:rgba(255,255,255,.5);text-transform:uppercase;letter-spacing:.5px">Streak</div></div>
+      </div>
+    </div>
+    <div style="padding:16px 14px 32px">
+      <div style="font-family:'Fraunces',serif;font-size:16px;font-weight:700;margin-bottom:12px">Mes chats spottés</div>
+      ${myCats.length?`<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">${cards}</div>`:`<div style="text-align:center;padding:32px;color:var(--muted);font-size:14px">Tu n'as pas encore spotté de chat 🐱</div>`}
+    </div>
+  </div>`;
+  modal.addEventListener("click",e=>{if(e.target===modal)modal.remove();});
+  document.body.appendChild(modal);
+}
+window.showMyProfile=showMyProfile;
 const FEED_PAGE_SIZE = 20;
 
 function renderFeed(append=false){
@@ -1052,9 +1171,15 @@ function renderFeed(append=false){
     return;
   }
 
+  const filteredCats = getFilteredCats();
   const colors=["#D4572A","#C9853A","#7B9EA6","#B85C38","#8B6CA6","#C0392B"];
-  const slice=cats.slice(feedPage*FEED_PAGE_SIZE, (feedPage+1)*FEED_PAGE_SIZE);
-  const hasMore=cats.length > (feedPage+1)*FEED_PAGE_SIZE;
+  const slice=filteredCats.slice(feedPage*FEED_PAGE_SIZE, (feedPage+1)*FEED_PAGE_SIZE);
+  const hasMore=filteredCats.length > (feedPage+1)*FEED_PAGE_SIZE;
+
+  if(filteredCats.length===0){
+    wrap.innerHTML="<div class='feed-empty'><div class='feed-empty-icon'>🐱</div><div class='feed-empty-title'>"+(feedFilter==="nearby"?(lang==="fr"?"Aucun chat dans les 5km":"No cats within 5km"):t().feedEmpty)+"</div><div class='feed-empty-sub'>"+(feedFilter==="nearby"?(lang==="fr"?"Soit le premier à spotter un chat près de toi !":"Be the first to spot a cat near you!"):t().feedEmptySub)+"</div></div>";
+    return;
+  }
 
   const cards=slice.map(cat=>{
     const color=cat.color||colors[Math.abs(cat.name?.charCodeAt(0)||0)%colors.length];
@@ -1264,6 +1389,12 @@ $("photo-input").addEventListener("change",function(){
 async function publishSpot(){
   const name=$("input-name").value.trim()||"Chat inconnu";
   const desc=$("input-desc").value.trim()||null;
+
+  // Filtrage insultes
+  if(containsBadWord(name)||containsBadWord(desc)){
+    showToast("🚫 "+(lang==="fr"?"Contenu inapproprié détecté":"Inappropriate content detected"));
+    return;
+  }
   const file=$("photo-input").files[0]||null;
   const colors=["#D4572A","#C9853A","#7B9EA6","#B85C38","#8B6CA6"];
   const color=colors[Math.floor(Math.random()*colors.length)];
@@ -1509,11 +1640,12 @@ $("popup-like-btn").addEventListener("click",async ()=>{
   const cat=cats.find(c=>c.id===id);
   if(cat) cat.likes_count = (cat.likes_count||0) + (likes[id]?1:-1);
   updatePopupLike(selectedCat);
-  // Mettre à jour le feed si visible
   const btn=$("fl-"+id);
   if(btn&&cat){btn.innerHTML=(likes[id]?"❤️":"🤍")+" "+(cat.likes_count||0)+" "+t().likes;btn.style.color=likes[id]?"#D4572A":"#8A7F72";}
   await toggleLikeDB(id, wasLiked);
 });
+$("popup-respott-btn").addEventListener("click",()=>{ if(selectedCat) reSpot(selectedCat.id); });
+$("popup-report-btn").addEventListener("click",()=>{ if(selectedCat) reportCat(selectedCat.id); });
 document.querySelectorAll(".nav-btn").forEach(b=>b.addEventListener("click",()=>switchTab(b.dataset.tab)));
 $("pro-btn").addEventListener("click",()=>showToast("🚀 Bientôt disponible !"));
 
