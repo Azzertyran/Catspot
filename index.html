@@ -166,6 +166,9 @@ input:focus,textarea:focus{outline:none}
 .ch-card{display:flex;align-items:center;gap:12px;background:#fff;border-radius:14px;padding:13px 15px;border:1.5px solid transparent;transition:all .2s;cursor:pointer}
 .ch-card.done{background:#F0FDF4;border-color:#86EFAC}
 .ch-card:active{transform:scale(.98)}
+.ch-card.auto-validated{border-color:#BFDBFE;background:#EFF6FF}
+.ch-badge-auto{display:inline-flex;align-items:center;gap:3px;background:#3B82F6;color:#fff;font-size:8px;font-weight:800;padding:2px 6px;border-radius:10px;text-transform:uppercase;letter-spacing:.4px;margin-left:4px}
+.ch-badge-honour{display:inline-flex;align-items:center;gap:3px;background:#F59E0B;color:#fff;font-size:8px;font-weight:800;padding:2px 6px;border-radius:10px;text-transform:uppercase;letter-spacing:.4px;margin-left:4px}
 .ch-emoji{font-size:24px;width:32px;text-align:center}
 .ch-title{font-size:14px;font-weight:600;color:var(--dark)}
 .ch-pts{font-size:12px;color:var(--amber);font-weight:700;margin-top:2px}
@@ -624,21 +627,22 @@ const T = {
 };
 
 const CHALLENGES_DEF = [
-  {key:"ch1",  pts:50,  emoji:"🦊"},
-  {key:"ch2",  pts:30,  emoji:"🪟"},
-  {key:"ch3",  pts:75,  emoji:"👁️"},
-  {key:"ch4",  pts:20,  emoji:"😴"},
-  {key:"ch5",  pts:60,  emoji:"🐱"},
-  {key:"ch6",  pts:40,  emoji:"🌳"},
-  {key:"ch7",  pts:35,  emoji:"🌧️"},
-  {key:"ch8",  pts:80,  emoji:"🎩"},
-  {key:"ch9",  pts:45,  emoji:"🏙️"},
-  {key:"ch10", pts:55,  emoji:"🐾"},
-  {key:"ch11", pts:25,  emoji:"🌺"},
-  {key:"ch12", pts:90,  emoji:"👑"},
-  {key:"ch13", pts:30,  emoji:"🚗"},
-  {key:"ch14", pts:65,  emoji:"🌙"},
-  {key:"ch15", pts:50,  emoji:"📦"},
+  // AUTO — validés automatiquement par l'app
+  {key:"ch1",  pts:50,  emoji:"🦊", auto:false},
+  {key:"ch2",  pts:30,  emoji:"🪟", auto:false},
+  {key:"ch3",  pts:75,  emoji:"👁️", auto:false},
+  {key:"ch4",  pts:20,  emoji:"😴", auto:false},
+  {key:"ch5",  pts:60,  emoji:"🐱", auto:false},
+  {key:"ch6",  pts:40,  emoji:"🌳", auto:false},
+  {key:"ch7",  pts:35,  emoji:"🌧️", auto:false},
+  {key:"ch8",  pts:80,  emoji:"🎩", auto:false},
+  {key:"ch9",  pts:45,  emoji:"🏙️", auto:false},
+  {key:"ch10", pts:55,  emoji:"🐾", auto:false},
+  {key:"ch11", pts:25,  emoji:"🌺", auto:false},
+  {key:"ch12", pts:90,  emoji:"👑", auto:false},
+  {key:"ch13", pts:30,  emoji:"🚗", auto:false},
+  {key:"ch14", pts:65,  emoji:"🌙", auto:false},
+  {key:"ch15", pts:50,  emoji:"📦", auto:false},
 ];
 const BADGES_DEF = [
   {key:"badge1", icon:"🐾", threshold:1},
@@ -1442,11 +1446,13 @@ window.signInWithGoogle = signInWithGoogle;
 window.signOut = signOut;
 
 // ── FILTRAGE INSULTES ─────────────────────────────────────────
-const BAD_WORDS=["merde","putain","connard","connasse","salope","enculé","pute","bite","niquer","nique","baise","con","conne","fdp","ntm","pd","fuck","shit","bitch","asshole","bastard","cunt","dick","cock","pussy","whore","faggot","retard","kys"];
+const BAD_WORDS=["merde","putain","connard","connasse","salope","enculé","pute","bite","niquer","nique","baise","fdp","ntm","fuck","shit","bitch","asshole","bastard","cunt","dick","cock","pussy","whore","faggot","kys"];
 function containsBadWord(text){
   if(!text) return false;
   const lower=text.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"");
-  return BAD_WORDS.some(w=>lower.includes(w));
+  // Vérifier sur mots entiers uniquement (évite "con" dans "économie", etc.)
+  const words = lower.split(/[\s\-_.,!?]+/);
+  return BAD_WORDS.some(w=>words.includes(w));
 }
 
 // ── MON PROFIL ────────────────────────────────────────────────
@@ -1718,25 +1724,31 @@ function renderMissions(){
   const progress = loadMissionsProgress();
   const wrap = $("missions-list");
   if(!wrap) return;
-  $("missions-title").textContent = t().missionsTitle;
-  // Calcul heure reset
+  const titleEl = $("missions-title"); if(titleEl) titleEl.textContent = t().missionsTitle;
   const now = new Date();
   const hoursLeft = 24 - now.getHours();
-  if($("missions-reset")) $("missions-reset").textContent = t().missionsReset(hoursLeft);
-  wrap.innerHTML = missions.map(m=>{
-    const done = progress.done.includes(m.key);
-    const title = lang==="fr" ? m.titleFr : m.titleEn;
-    const desc  = lang==="fr" ? m.descFr  : m.descEn;
-    return `<div class="mission-card${done?" done":""}" onclick="toggleMission('${m.key}')">
-      <span class="mission-icon">${m.emoji}</span>
-      <div style="flex:1">
-        <div class="mission-title">${title}</div>
-        <div class="mission-desc">${desc}</div>
-        <div class="mission-pts">+${m.pts} pts</div>
-      </div>
-      <div class="mission-check${done?" done":""}">${done?"✓":"○"}</div>
-    </div>`;
-  }).join("");
+  const resetEl = $("missions-reset"); if(resetEl) resetEl.textContent = t().missionsReset(hoursLeft);
+  wrap.innerHTML =
+    `<div style="font-size:11px;color:var(--muted);padding:0 2px 10px;line-height:1.5">
+      ⚡ <strong>Missions auto</strong> — se valident seules quand tu fais l'action !
+    </div>` +
+    missions.map(m=>{
+      const done = progress.done.includes(m.key);
+      const title = lang==="fr" ? m.titleFr : m.titleEn;
+      const desc  = lang==="fr" ? m.descFr  : m.descEn;
+      // Si pas encore faite → grisée, pas cliquable manuellement
+      const style = !done ? "opacity:0.85" : "";
+      return `<div class="mission-card${done?" done":""}" style="${style}" onclick="${done?"":""}toggleMission('${m.key}')">
+        <span class="mission-icon">${m.emoji}</span>
+        <div style="flex:1">
+          <div class="mission-title">${title} <span class="ch-badge-auto">⚡ Auto</span></div>
+          <div class="mission-desc">${desc}</div>
+          <div class="mission-pts">+${m.pts} pts</div>
+        </div>
+        <div class="mission-check${done?" done":""}">${done?"✓":"⏳"}</div>
+      </div>`;
+    }).join("");
+}
 }
 
 function toggleMission(key){
@@ -1813,9 +1825,22 @@ function renderChallenges(){
   const ptsWeek=$("pts-week"); if(ptsWeek) ptsWeek.textContent=t().thisWeek;
   const chTitle=$("ch-section-title"); if(chTitle) chTitle.textContent=t().chSection;
   renderMissions();
-  $("ch-list").innerHTML=challenges.map((c,i)=>
-    "<div class='ch-card"+(c.done?" done":"")+"' onclick='toggleChallenge("+i+")'><span class='ch-emoji'>"+c.emoji+"</span><div><div class='ch-title'>"+t()[c.key]+"</div><div class='ch-pts'>+"+c.pts+" pts</div></div><div class='ch-status' style='background:"+(c.done?"#4ADE80":"#F1F5F9")+";color:"+(c.done?"#fff":"#94A3B8")+"'>"+(c.done?"✓":"○")+"</div></div>"
-  ).join("");
+  const chList=$("ch-list");
+  if(!chList) return;
+  chList.innerHTML =
+    `<div style="font-size:11px;color:var(--muted);padding:6px 2px 10px;line-height:1.5">
+      🤝 <strong>Défis sur l'honneur</strong> — prends la photo, puis coche !
+    </div>` +
+    challenges.map((c,i)=>
+      `<div class='ch-card${c.done?" done":""}' onclick='toggleChallenge(${i})'>
+        <span class='ch-emoji'>${c.emoji}</span>
+        <div style="flex:1">
+          <div class='ch-title'>${t()[c.key]||c.key}</div>
+          <div class='ch-pts'>+${c.pts} pts</div>
+        </div>
+        <div class='ch-status' style='background:${c.done?"#4ADE80":"#F1F5F9"};color:${c.done?"#fff":"#94A3B8"}'>${c.done?"✓":"○"}</div>
+      </div>`
+    ).join("");
 }
 
 function toggleChallenge(i){
@@ -1968,8 +1993,13 @@ async function publishSpot(){
   const file=$("photo-input").files[0]||null;
   const colors=["#D4572A","#C9853A","#7B9EA6","#B85C38","#8B6CA6"];
   const color=colors[Math.floor(Math.random()*colors.length)];
-  const newLat=userLat+(Math.random()-0.5)*0.002;
-  const newLng=userLng+(Math.random()-0.5)*0.002;
+  const newLat = typeof userLat === "number" ? userLat+(Math.random()-0.5)*0.002 : 47.4784;
+  const newLng = typeof userLng === "number" ? userLng+(Math.random()-0.5)*0.002 : -0.5632;
+
+  if(!newLat || !newLng){
+    showToast("❌ "+(lang==="fr"?"Position non disponible, réessaie":"Location unavailable, try again"));
+    return;
+  }
 
   const posted_by = currentUser?.user_metadata?.full_name 
     || currentUser?.email?.split("@")[0] 
