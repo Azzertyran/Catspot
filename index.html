@@ -511,7 +511,7 @@ input:focus,textarea:focus{outline:none}
 
         <!-- Footer créateur -->
         <div style="text-align:center;padding:8px 0 4px;border-top:1px solid #f0ece6;margin-top:4px">
-          <div style="font-size:12px;color:var(--muted)">Une app créée par</div>
+          <div style="font-size:12px;color:var(--muted)" id="footer-created">Une app créée par</div>
           <div style="font-size:14px;font-weight:700;color:var(--dark);margin-top:2px">Philippe Auger</div>
           <a href="mailto:pilipog49@gmail.com" style="font-size:12px;color:var(--terra);text-decoration:none">pilipog49@gmail.com</a>
           <div style="font-size:11px;color:#ccc;margin-top:6px">Catspot v1.0 🐾</div>        </div>
@@ -562,7 +562,7 @@ input:focus,textarea:focus{outline:none}
 </div>
 
 <!-- Modal SOS -->
-<div id="sos-modal-overlay" style="position:fixed;inset:0;background:rgba(28,25,21,.62);z-index:200;display:none;align-items:flex-end;backdrop-filter:blur(4px)">
+<div id="sos-modal-overlay" onclick="if(event.target===this)closeSosModal()" style="position:fixed;inset:0;background:rgba(28,25,21,.62);z-index:200;display:none;align-items:flex-end;backdrop-filter:blur(4px)">
   <div style="background:var(--light);border-radius:24px 24px 0 0;padding:20px;width:100%;max-height:85vh;overflow-y:auto">
     <div style="font-family:'Fraunces',serif;font-size:18px;font-weight:700;margin-bottom:16px">🐱 Signaler un chat</div>
     <!-- Type -->
@@ -609,7 +609,8 @@ const T = {
     published:"Publié ! 🐾 Ton chat est sur la carte",
     justNow:"À l'instant", minsAgo:n=>"il y a "+n+" min", hoursAgo:n=>"il y a "+n+"h",
     sightings:n=>n+" signalement"+(n>1?"s":""),
-    likes:"likes", yourPts:"Tes points", thisWeek:"Cette semaine",
+    likes:n=>(n||0)+" like"+(n>1?"s":""), yourPts:"Tes points", thisWeek:"Cette semaine",
+    footerCreated:"Une app créée par",
     chSection:"Défis", badgesTitle:"Badges",
     friendly:"Câlin", wild:"Sauvage", shy:"Timide", playful:"Joueur", proud:"Fier", sleepy:"Endormi", grumpy:"Grognon", curious:"Curieux",
     legend:"Légendaire ⭐", proud:"Fier", sleepy:"Endormi", grumpy:"Grognon", curious:"Curieux",
@@ -687,7 +688,8 @@ const T = {
     published:"Published! 🐾 Your cat is on the map",
     justNow:"Just now", minsAgo:n=>n+" min ago", hoursAgo:n=>n+"h ago",
     sightings:n=>n+" sighting"+(n>1?"s":""),
-    likes:"likes", yourPts:"Your points", thisWeek:"This week",
+    likes:n=>(n||0)+" like"+(n>1?"s":""), yourPts:"Your points", thisWeek:"This week",
+    footerCreated:"An app created by",
     chSection:"Challenges", badgesTitle:"Badges",
     friendly:"Friendly", wild:"Wild", shy:"Shy", playful:"Playful", proud:"Proud", sleepy:"Sleepy", grumpy:"Grumpy", curious:"Curious",
     legend:"Legendary ⭐", proud:"Proud", sleepy:"Sleepy", grumpy:"Grumpy", curious:"Curious",
@@ -1122,15 +1124,12 @@ function initMap(){
   mapInstance.on("load", ()=>{
     hideLoading();
     mapInstance.resize();
-    // Ne render les marqueurs que si les chats sont déjà chargés
-    // Sinon l'init principale s'en charge après loadCats()
-    if(cats.length > 0){
+    $("map-empty").classList.remove("visible");
+    if(cats.length > 0 && Object.keys(markers).length === 0){
       renderMapCats();
       updateCatOfDay();
       addDynamicHotspots();
     }
-    // Masquer le message "vide" — les données arrivent dans un instant
-    $("map-empty").classList.remove("visible");
   });
 
   mapInstance.on("click", ()=>{ if(selectedCat) closePopup(); });
@@ -1203,7 +1202,7 @@ function updateCatOfDay(){
   if((best.likes_count||0)===0){$("cod-banner").classList.remove("visible");return;}
   $("cod-label").textContent = t().codLabel;
   $("cod-name").textContent = best.name || "Inconnu";
-  $("cod-likes").textContent = "❤️ "+(best.likes_count||0)+" likes";
+  $("cod-likes").textContent = "❤️ "+t().likes(best.likes_count||0);
   // Photo miniature
   const photoEl = $("cod-photo");
   if(best.photo_url){
@@ -1559,8 +1558,9 @@ window.submitReport=submitReport;
 
 // ── COMMENTAIRES ──────────────────────────────────────────────
 async function showComments(catId){
-  const cat=cats.find(c=>c.id===catId);
-  if(!cat) return;
+  let cat = cats.find(c=>c.id===catId);
+  // Si pas dans cats[] (chat supprimé localement ou chargement partiel), créer un objet minimal
+  if(!cat) cat = {id:catId, name:"Chat"};
   document.getElementById("comments-modal")?.remove();
   let comments=[];
   try { const {data}=await sb.from("comments").select("*").eq("cat_id",catId).order("created_at",{ascending:true}); comments=data||[]; } catch(e){}
@@ -1592,11 +1592,18 @@ async function postComment(catId){
   if(containsBadWord(text)){ showToast("🚫 "+(lang==="fr"?"Commentaire inapproprié":"Inappropriate comment")); return; }
   const author=currentUser?.user_metadata?.full_name||currentUser?.email?.split("@")[0]||(lang==="fr"?"Anonyme":"Anonymous");
   try {
-    await sb.from("comments").insert([{cat_id:catId,text,author}]);
-    // Mettre à jour le compteur local
+    // Via proxy pour fiabilité mobile
+    const res = await fetch("/api/comment", {
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({cat_id:catId, text, author})
+    });
+    if(!res.ok){
+      // Fallback direct
+      await sb.from("comments").insert([{cat_id:catId,text,author}]);
+    }
     commentCounts[catId] = (commentCounts[catId]||0)+1;
     completeMission("comment");
-    // Mettre à jour le bouton dans le feed sans re-render complet
     const feedBtn = document.querySelector(`button[onclick="showComments('${catId}')"]`);
     if(feedBtn){
       const n = commentCounts[catId];
@@ -1927,7 +1934,7 @@ function renderFeed(append=false){
       ${cat.desc?`<p class='feed-desc'>"${cat.desc}"</p>`:""}
       <div class='feed-actions'>
         <button class='feed-like-btn' id='fl-${cat.id}' onclick='toggleFeedLike("${cat.id}")' style='color:${isLiked?"#D4572A":"#8A7F72"}'>
-          ${isLiked?"❤️":"🤍"} ${cat.likes_count||0} ${t().likes}
+          ${isLiked?"❤️":"🤍"} ${t().likes(cat.likes_count||0)}
         </button>
         <button onclick="showComments('${cat.id}')" style="background:none;border:none;font-size:13px;color:${(commentCounts[cat.id]||0)>0?"var(--terra)":"var(--muted)"};cursor:pointer;font-family:'DM Sans',sans-serif;font-weight:600;display:flex;align-items:center;gap:4px">
           💬 ${(commentCounts[cat.id]||0)>0 ? commentCounts[cat.id]+" commentaire"+(commentCounts[cat.id]>1?"s":"") : (lang==="fr"?"Commenter":"Comment")}
@@ -1963,16 +1970,16 @@ function toggleFeedLike(id){
   likes[id] = !wasLiked;
   const cat = cats.find(c=>c.id===id);
   if(!cat) return;
-  // Ajuster likes_count local pour affichage immédiat
-  cat.likes_count = Math.max(0, (cat.likes_count||0) + (likes[id] ? 1 : -1));
+  // Affichage visuel immédiat sans modifier la source de vérité
+  const displayCount = Math.max(0, (cat.likes_count||0) + (likes[id] ? 1 : -1));
   const btn = $("fl-"+id);
-  if(btn){ btn.innerHTML = (likes[id]?"❤️":"🤍")+" "+cat.likes_count+" "+t().likes; btn.style.color = likes[id]?"#D4572A":"#8A7F72"; }
-  if(selectedCat?.id===id){ selectedCat.likes_count = cat.likes_count; updatePopupLike(selectedCat); }
+  if(btn){ btn.innerHTML = (likes[id]?"❤️":"🤍")+" "+t().likes(displayCount); btn.style.color = likes[id]?"#D4572A":"#8A7F72"; }
+  if(selectedCat?.id===id) updatePopupLike({...selectedCat, likes_count: displayCount});
   saveLikesToStorage();
   updateCatOfDay();
-  // Vérifier mission like3 : 3 likes aujourd'hui
   const todayLikes = Object.keys(likes).filter(k=>likes[k]).length;
   if(likes[id] && todayLikes >= 3) completeMission("like3");
+  if(likes[id] && todayLikes >= 5) completeMission("m8");
   toggleLikeDB(id, wasLiked);
 }
 
@@ -2131,18 +2138,27 @@ function renderMissions(){
 }
 
 function toggleMission(key){
-  if(!currentUser){showToast("🔒 Connecte-toi pour valider les missions");return;}
+  // Les missions auto ne peuvent PAS être cochées manuellement
+  const mission = ALL_MISSIONS.find(x=>x.key===key);
+  if(!mission) return;
+  if(mission.type !== "all3") {
+    showToast(lang==="fr"?"⚡ Cette mission se valide automatiquement !":"⚡ This mission validates automatically!");
+    return;
+  }
+  if(!currentUser){ showToast("🔒 "+(lang==="fr"?"Connecte-toi pour valider les missions":"Sign in to validate missions")); return; }
   const progress = loadMissionsProgress();
   if(progress.done.includes(key)){
     progress.done = progress.done.filter(k=>k!==key);
   } else {
+    // Vérifier si les 3 autres missions du jour sont complètes
+    const dailyMissions = getDailyMissions().filter(m=>m.key!==key);
+    const allDone = dailyMissions.every(m=>progress.done.includes(m.key));
+    if(!allDone){ showToast(lang==="fr"?"Complète les 3 autres missions d'abord !":"Complete the other 3 missions first!"); return; }
     progress.done.push(key);
-    const m = ALL_MISSIONS.find(x=>x.key===key);
-    if(m) showToast(`🎯 +${m.pts} pts — Mission validée !`);
+    showToast(`🎯 +${mission.pts} pts — ${lang==="fr"?mission.titleFr:mission.titleEn} !`);
   }
   saveMissionsProgress(progress);
   renderMissions();
-  // Mettre à jour le total de points
   if($("pts-total")) $("pts-total").textContent = totalPts();
 }
 window.toggleMission = toggleMission;
@@ -2499,6 +2515,7 @@ function applyLang(){
   const sosF=$("sos-filter-found"); if(sosF) sosF.textContent=t().sosFound;
   const sosB=$("sos-signal-btn"); if(sosB) sosB.textContent=t().sosBtn;
   const sosV=$("sos-vets-title"); if(sosV) sosV.textContent=t().sosVets;
+  const fc=$("footer-created"); if(fc) fc.textContent=t().footerCreated;
   updateAuthUI();
   if(currentTab==="feed") renderFeed();
   if(currentTab==="challenges") renderChallenges();
@@ -2671,7 +2688,7 @@ $("popup-like-btn").addEventListener("click",async ()=>{
   }
   updatePopupLike(selectedCat);
   const btn = $("fl-"+id);
-  if(btn&&cat){ btn.innerHTML=(likes[id]?"❤️":"🤍")+" "+cat.likes_count+" "+t().likes; btn.style.color=likes[id]?"#D4572A":"#8A7F72"; }
+  if(btn&&cat){ btn.innerHTML=(likes[id]?"❤️":"🤍")+" "+t().likes(cat.likes_count||0); btn.style.color=likes[id]?"#D4572A":"#8A7F72"; }
   saveLikesToStorage();
   updateCatOfDay();
   await toggleLikeDB(id, wasLiked);
