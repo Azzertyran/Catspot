@@ -1820,7 +1820,7 @@ async function shareCat(cat){
   const text = lang==="fr"
     ? `🐱 J'ai spotté "${cat.name||"un chat"}" sur Catspot ! Viens voir les chats de ton quartier 🗺️`
     : `🐱 I spotted "${cat.name||"a cat"}" on Catspot! Come see the cats in your neighborhood 🗺️`;
-  const url = "https://catspot-gray.vercel.app";
+  const url = "https://www.catspot.app";
   if(navigator.share){
     try {
       await navigator.share({title:"Catspot 🐱", text, url});
