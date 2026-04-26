@@ -1077,27 +1077,42 @@ async function saveCat(catData){
   }
 }
 
+let likeInProgress = new Set(); // Verrou par cat ID
+
 async function toggleLikeDB(catId, wasLiked){
-  if(!isRealUser()){
-    const pending = JSON.parse(localStorage.getItem("catspot_pending_likes")||"[]");
-    if(!wasLiked && !pending.includes(catId)) pending.push(catId);
-    else { const i=pending.indexOf(catId); if(i>-1) pending.splice(i,1); }
-    localStorage.setItem("catspot_pending_likes", JSON.stringify(pending));
-    // Mettre à jour le compteur anonyme via proxy
-    try {
-      const cat = cats.find(c=>c.id===catId);
-      await fetch("/api/like", {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({cat_id:catId, count:cat?.likes_count||0})});
-    } catch(e){}
-    return;
-  }
-  // Utilisateur connecté — via proxy
+  if(likeInProgress.has(catId)) return; // Verrou — ignorer si déjà en cours
+  likeInProgress.add(catId);
   try {
+    if(!isRealUser()){
+      const pending = JSON.parse(localStorage.getItem("catspot_pending_likes")||"[]");
+      if(!wasLiked && !pending.includes(catId)) pending.push(catId);
+      else { const i=pending.indexOf(catId); if(i>-1) pending.splice(i,1); }
+      localStorage.setItem("catspot_pending_likes", JSON.stringify(pending));
+      return;
+    }
+    // Utiliser upsert/delete sur la table likes — le count se recalcule proprement
     await fetch("/api/like", {
       method: wasLiked ? "DELETE" : "POST",
       headers: {"Content-Type":"application/json"},
-      body: JSON.stringify({cat_id:catId, user_id:currentUser.id, was_liked:wasLiked, likes_count: cats.find(c=>c.id===catId)?.likes_count||0})
+      body: JSON.stringify({cat_id:catId, user_id:currentUser.id, was_liked:wasLiked})
     });
+    // Recharger le vrai likes_count depuis Supabase après l'opération
+    setTimeout(async ()=>{
+      try {
+        const {data} = await sb.from("cats").select("likes_count").eq("id",catId).single();
+        if(data){
+          const cat = cats.find(c=>c.id===catId);
+          if(cat) cat.likes_count = data.likes_count;
+          // Mettre à jour l'affichage
+          const btn = $("fl-"+catId);
+          if(btn) btn.innerHTML = (likes[catId]?"❤️":"🤍")+" "+t().likes(data.likes_count||0);
+          if(selectedCat?.id===catId) updatePopupLike({...selectedCat, likes_count:data.likes_count});
+          updateCatOfDay();
+        }
+      } catch(e){}
+    }, 1000);
   } catch(e){ console.error("toggleLikeDB:", e); }
+  finally { likeInProgress.delete(catId); }
 }
 
 async function uploadPhoto(file, catId){
