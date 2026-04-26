@@ -665,6 +665,7 @@ let mapInstance = null;
 let markers = {};
 let userLat = 47.4784, userLng = -0.5632; // Avrillé par défaut
 let selectedChar = null;
+let selectedPhotoFile = null; // Stockage direct du fichier photo — DataTransfer non supporté iOS
 let currentUser = null;  // auth Supabase
 let userProfile = {totalCats:0, streak:0, totalLikes:0};
 
@@ -1939,6 +1940,7 @@ window.selectEmoji=selectEmoji;
 function openModal(){
   selectedChar=null;
   selectedEmoji="🐱";
+  selectedPhotoFile=null; // Reset photo
   $("input-name").value="";
   $("input-desc").value="";
   const old=$("photo-zone").querySelector(".photo-preview");
@@ -1971,6 +1973,7 @@ function closeModal(){$("modal-overlay").classList.remove("open");}
 
 function handlePhotoInput(file){
   if(!file) return;
+  selectedPhotoFile = file; // Stockage direct — compatible iOS Safari
   const url=URL.createObjectURL(file);
   $("photo-zone").querySelector(".photo-zone-icon").style.display="none";
   $("photo-zone").querySelector(".photo-zone-tip").style.display="none";
@@ -1978,9 +1981,6 @@ function handlePhotoInput(file){
   const old=$("photo-zone").querySelector(".photo-preview");if(old)old.remove();
   const img=document.createElement("img");img.className="photo-preview";img.src=url;
   $("photo-zone").appendChild(img);
-  // Stocker dans photo-input pour publishSpot
-  const dt=new DataTransfer();dt.items.add(file);
-  $("photo-input").files=dt.files;
 }
 
 $("photo-camera").addEventListener("change",function(){ handlePhotoInput(this.files[0]); });
@@ -1995,7 +1995,7 @@ async function publishSpot(){
     showToast("🚫 "+(lang==="fr"?"Contenu inapproprié détecté":"Inappropriate content detected"));
     return;
   }
-  const file=$("photo-input").files[0]||null;
+  const file = selectedPhotoFile || null; // Compatible iOS — pas de DataTransfer
   const colors=["#D4572A","#C9853A","#7B9EA6","#B85C38","#8B6CA6"];
   const color=colors[Math.floor(Math.random()*colors.length)];
   const newLat = typeof userLat === "number" ? userLat+(Math.random()-0.5)*0.002 : 47.4784;
