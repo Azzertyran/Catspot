@@ -825,16 +825,20 @@ function showToast(msg){
 
 // ── AUTH ──────────────────────────────────────────────────────
 async function initAuth(){
-  // Gérer le retour OAuth
   if(window.location.hash && window.location.hash.includes("access_token")){
     await new Promise(r=>setTimeout(r,500));
     history.replaceState(null,"",window.location.pathname);
   }
 
+  const clearSupabaseStorage = ()=>{
+    Object.keys(localStorage).filter(k=>k.startsWith("sb-")||k.includes("supabase")).forEach(k=>localStorage.removeItem(k));
+    Object.keys(sessionStorage).filter(k=>k.startsWith("sb-")||k.includes("supabase")).forEach(k=>sessionStorage.removeItem(k));
+  };
+
   try {
     const {data, error} = await sb.auth.getSession();
     if(error){
-      // Token invalide/expiré — nettoyer et repartir propre
+      clearSupabaseStorage();
       await sb.auth.signOut().catch(()=>{});
       currentUser = null;
     } else if(data?.session?.user){
@@ -842,12 +846,11 @@ async function initAuth(){
       await Promise.all([loadUserLikes(), loadUserProfile()]);
       await loadChallengesForUser();
     } else {
+      currentUser = null;
     }
   } catch(e){
-    // Si refresh token invalide → nettoyer le storage Supabase
-    if(e.message?.includes("Refresh Token") || e.message?.includes("refresh_token")){
-      Object.keys(localStorage).filter(k=>k.startsWith("sb-")).forEach(k=>localStorage.removeItem(k));
-    }
+    console.error("initAuth:", e.message);
+    clearSupabaseStorage();
     currentUser = null;
   }
 
@@ -962,10 +965,17 @@ async function loadCats(){
 async function loadCommentCounts(){
   if(!cats.length) return;
   try {
-    const catIds = cats.map(c=>c.id);
-    const {data} = await sb.from("comments").select("cat_id").in("cat_id", catIds);
+    // Un seul appel pour tous les cats
+    const res = await fetch(`/api/comments?cat_id=in.(${cats.map(c=>c.id).join(',')})`).catch(()=>null);
+    let data = [];
+    if(res?.ok) data = await res.json();
+    else {
+      const catIds = cats.map(c=>c.id);
+      const r = await sb.from("comments").select("cat_id").in("cat_id", catIds);
+      data = r.data||[];
+    }
     commentCounts = {};
-    (data||[]).forEach(row=>{ commentCounts[row.cat_id] = (commentCounts[row.cat_id]||0)+1; });
+    data.forEach(row=>{ commentCounts[row.cat_id] = (commentCounts[row.cat_id]||0)+1; });
   } catch(e){ }
 }
 
@@ -1559,11 +1569,18 @@ window.submitReport=submitReport;
 // ── COMMENTAIRES ──────────────────────────────────────────────
 async function showComments(catId){
   let cat = cats.find(c=>c.id===catId);
-  // Si pas dans cats[] (chat supprimé localement ou chargement partiel), créer un objet minimal
   if(!cat) cat = {id:catId, name:"Chat"};
   document.getElementById("comments-modal")?.remove();
   let comments=[];
-  try { const {data}=await sb.from("comments").select("*").eq("cat_id",catId).order("created_at",{ascending:true}); comments=data||[]; } catch(e){}
+  try {
+    // Via proxy pour fiabilité mobile
+    const res = await fetch(`/api/comments?cat_id=${catId}`);
+    if(res.ok) comments = await res.json();
+    else {
+      const {data} = await sb.from("comments").select("*").eq("cat_id",catId).order("created_at",{ascending:true});
+      comments = data||[];
+    }
+  } catch(e){ comments=[]; }
   const modal=document.createElement("div");
   modal.id="comments-modal";
   modal.style.cssText="position:fixed;inset:0;background:rgba(28,25,21,.65);z-index:300;display:flex;align-items:flex-end;backdrop-filter:blur(4px)";
