@@ -888,14 +888,19 @@ async function loadUserLikes(){
 
 async function saveCat(catData){
   try {
-    const {data,error} = await sb.from("cats").insert([catData]).select().single();
+    // Timeout 10s — si Supabase ne répond pas, on affiche une erreur
+    const timeout = new Promise((_,reject)=>setTimeout(()=>reject(new Error("Timeout — vérifie ta connexion")), 10000));
+    const insert = sb.from("cats").insert([catData]).select().single();
+    const {data,error} = await Promise.race([insert, timeout]);
     if(error){
-      console.error("saveCat ERREUR:", error.message, error.details, error.hint);
-      showToast("❌ Erreur: "+error.message);
+      showToast("❌ "+error.message);
       return null;
     }
     return data;
-  } catch(e){ console.error("saveCat EXCEPTION:", e); showToast("❌ Erreur de publication"); return null; }
+  } catch(e){
+    showToast("❌ "+(e.message||"Erreur de publication"));
+    return null;
+  }
 }
 
 async function toggleLikeDB(catId, wasLiked){
@@ -2023,26 +2028,27 @@ async function _doPublish(){
   const file = selectedPhotoFile || null;
   const colors = ["#D4572A","#C9853A","#7B9EA6","#B85C38","#8B6CA6"];
   const color = colors[Math.floor(Math.random()*colors.length)];
-  const newLat = typeof userLat === "number" && userLat !== 0 ? userLat : 47.4784;
-  const newLng = typeof userLng === "number" && userLng !== 0 ? userLng : -0.5632;
+  const newLat = parseFloat(userLat) || 47.4784;
+  const newLng = parseFloat(userLng) || -0.5632;
 
   const posted_by = currentUser?.user_metadata?.full_name
     || currentUser?.email?.split("@")[0]
     || (lang==="fr"?"Anonyme":"Anonymous");
 
+  showToast("📡 Envoi...");
   console.log("Publication: lat=", newLat, "lng=", newLng, "name=", name);
 
   const saved = await saveCat({
-    name,
-    color,
-    lat: newLat,
-    lng: newLng,
-    char: selectedChar || "friendly",
+    name: String(name),
+    color: String(color),
+    lat: Number(newLat),
+    lng: Number(newLng),
+    char: String(selectedChar || "friendly"),
     sightings: 1,
     likes_count: 0,
     legend: false,
-    description: desc,
-    posted_by
+    description: String(desc || ""),
+    posted_by: String(posted_by)
   });
 
   // Si la sauvegarde Supabase échoue → on arrête, l'erreur est déjà affichée
