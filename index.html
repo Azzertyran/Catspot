@@ -2012,66 +2012,68 @@ async function publishSpot(){
 }
 
 async function _doPublish(){
-  const name=$("input-name").value.trim()||"Chat inconnu";
-  const desc=$("input-desc").value.trim()||"";
+  const name = $("input-name").value.trim() || "Chat inconnu";
+  const desc = $("input-desc").value.trim() || "";
 
-  // Filtrage insultes
-  if(containsBadWord(name)||containsBadWord(desc)){
-    showToast("🚫 "+(lang==="fr"?"Contenu inapproprié détecté":"Inappropriate content detected"));
-    return;
-  }
-  const file = selectedPhotoFile || null; // Compatible iOS — pas de DataTransfer
-  const colors=["#D4572A","#C9853A","#7B9EA6","#B85C38","#8B6CA6"];
-  const color=colors[Math.floor(Math.random()*colors.length)];
-  const newLat = typeof userLat === "number" ? userLat+(Math.random()-0.5)*0.002 : 47.4784;
-  const newLng = typeof userLng === "number" ? userLng+(Math.random()-0.5)*0.002 : -0.5632;
-
-  if(!newLat || !newLng){
-    showToast("❌ "+(lang==="fr"?"Position non disponible, réessaie":"Location unavailable, try again"));
+  if(containsBadWord(name) || containsBadWord(desc)){
+    showToast("🚫 "+(lang==="fr"?"Contenu inapproprié":"Inappropriate content"));
     return;
   }
 
-  const posted_by = currentUser?.user_metadata?.full_name 
-    || currentUser?.email?.split("@")[0] 
+  const file = selectedPhotoFile || null;
+  const colors = ["#D4572A","#C9853A","#7B9EA6","#B85C38","#8B6CA6"];
+  const color = colors[Math.floor(Math.random()*colors.length)];
+  const newLat = typeof userLat === "number" && userLat !== 0 ? userLat : 47.4784;
+  const newLng = typeof userLng === "number" && userLng !== 0 ? userLng : -0.5632;
+
+  const posted_by = currentUser?.user_metadata?.full_name
+    || currentUser?.email?.split("@")[0]
     || (lang==="fr"?"Anonyme":"Anonymous");
 
-  const saved=await saveCat({
-    name, color, lat:newLat, lng:newLng,
-    char:selectedChar||"friendly", sightings:1, likes_count:0, legend:false,
-    description:desc||"", posted_by
+  console.log("Publication: lat=", newLat, "lng=", newLng, "name=", name);
+
+  const saved = await saveCat({
+    name,
+    color,
+    lat: newLat,
+    lng: newLng,
+    char: selectedChar || "friendly",
+    sightings: 1,
+    likes_count: 0,
+    legend: false,
+    description: desc,
+    posted_by
   });
 
-  const cat=saved ? {...saved, likes:0, desc:saved.description} : {
-    id:"local-"+Date.now(), name, color,
-    lat:newLat, lng:newLng, sightings:1, likes_count:0, likes:0,
-    created_at:new Date().toISOString(), desc, description:desc, char:selectedChar||"friendly", legend:false
-  };
+  // Si la sauvegarde Supabase échoue → on arrête, l'erreur est déjà affichée
+  if(!saved){
+    console.error("Publication échouée — saveCat null");
+    return;
+  }
 
-  // 2. Upload photo si disponible (avec ou sans compte)
-  if(file){
-    const catId = saved?.id || cat.id;
-    console.log("Publication: upload photo pour cat", catId);
-    const url = await uploadPhoto(file, catId);
+  const cat = {...saved, likes:0, desc:saved.description||""};
+
+  // Upload photo si présente
+  if(file && saved.id){
+    console.log("Upload photo pour cat", saved.id);
+    const url = await uploadPhoto(file, saved.id);
     if(url){
       cat.photo_url = url;
-      // Mettre à jour la photo_url en base si le cat a été sauvegardé
-      if(saved?.id){
-        await sb.from("cats").update({photo_url: url}).eq("id", saved.id);
-      }
+      await sb.from("cats").update({photo_url: url}).eq("id", saved.id).catch(e=>console.warn("update photo_url:", e));
     }
   }
 
+  // Succès
   cats.unshift(cat);
+  selectedPhotoFile = null;
   userProfile.totalCats = (userProfile.totalCats||0) + 1;
-  // Missions automatiques
   completeMission("post");
   if(file) completeMission("photo");
-  // Supprimer le pin manuel temporaire
   if(manualPinMarker){ manualPinMarker.remove(); manualPinMarker=null; }
   closeModal();
   showToast(t().published);
 
-  if(mapInstance&&mapInstance.isStyleLoaded()){
+  if(mapInstance && mapInstance.isStyleLoaded()){
     addCatMarker(cat);
     $("map-empty").classList.remove("visible");
     updateCatOfDay();
