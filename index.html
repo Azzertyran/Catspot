@@ -308,11 +308,11 @@ input:focus,textarea:focus{outline:none}
         </div>
         <!-- Légende couleurs temporelles -->
         <div id="pin-legend" style="position:absolute;bottom:80px;right:10px;background:rgba(249,246,240,0.93);backdrop-filter:blur(8px);border-radius:10px;padding:7px 10px;z-index:5;border:1px solid rgba(0,0,0,0.07);box-shadow:0 2px 10px rgba(0,0,0,0.1)">
-          <div style="font-size:9px;font-weight:700;color:#8A7F72;text-transform:uppercase;letter-spacing:.7px;margin-bottom:5px">Vu il y a</div>
+          <div id="pin-legend-title" style="font-size:9px;font-weight:700;color:#8A7F72;text-transform:uppercase;letter-spacing:.7px;margin-bottom:5px">Vu il y a</div>
           <div style="display:flex;flex-direction:column;gap:4px">
-            <div style="display:flex;align-items:center;gap:6px"><div style="width:10px;height:10px;border-radius:50%;background:#E8541A"></div><span style="font-size:10px;color:#444">Moins d'1h</span></div>
-            <div style="display:flex;align-items:center;gap:6px"><div style="width:10px;height:10px;border-radius:50%;background:#3B82F6"></div><span style="font-size:10px;color:#444">Aujourd'hui</span></div>
-            <div style="display:flex;align-items:center;gap:6px"><div style="width:10px;height:10px;border-radius:50%;background:#9CA3AF"></div><span style="font-size:10px;color:#444">Plus ancien</span></div>
+            <div style="display:flex;align-items:center;gap:6px"><div style="width:10px;height:10px;border-radius:50%;background:#E8541A"></div><span id="pin-legend-1" style="font-size:10px;color:#444">Moins d'1h</span></div>
+            <div style="display:flex;align-items:center;gap:6px"><div style="width:10px;height:10px;border-radius:50%;background:#3B82F6"></div><span id="pin-legend-2" style="font-size:10px;color:#444">Aujourd'hui</span></div>
+            <div style="display:flex;align-items:center;gap:6px"><div style="width:10px;height:10px;border-radius:50%;background:#9CA3AF"></div><span id="pin-legend-3" style="font-size:10px;color:#444">Plus ancien</span></div>
           </div>
         </div>
         <div id="map-empty" class="visible">
@@ -358,8 +358,8 @@ input:focus,textarea:focus{outline:none}
       <!-- Header feed avec filtres -->
       <div style="position:sticky;top:0;z-index:5;background:var(--light);padding:10px 14px 8px;border-bottom:1px solid #f0ece6;display:flex;align-items:center;justify-content:space-between">
         <div style="display:flex;gap:6px">
-          <button id="feed-filter-global" class="feed-filter-btn active" onclick="setFeedFilter('global')">🌍 Global</button>
-          <button id="feed-filter-nearby" class="feed-filter-btn" onclick="setFeedFilter('nearby')">📍 Près de moi</button>
+          <button id="feed-filter-global" class="feed-filter-btn active" onclick="setFeedFilter('global')" id="btn-feed-global">🌍 Global</button>
+          <button id="feed-filter-nearby" class="feed-filter-btn" onclick="setFeedFilter('nearby')" id="btn-feed-nearby">📍 Près de moi</button>
         </div>
         <button onclick="refreshFeed()" style="background:var(--warm);border:none;border-radius:20px;padding:6px 12px;font-size:12px;font-weight:700;color:var(--mid);cursor:pointer;font-family:'DM Sans',sans-serif">↻ Refresh</button>
       </div>
@@ -633,14 +633,37 @@ const T = {
     codLabel:"Chat du jour", lang:"EN 🌍",
     missionsTitle:"🎯 Missions du jour",
     missionsReset:h=>"Nouvelles missions dans "+h+"h",
+    missionsLegend:"⚡ Missions auto — se valident seules quand tu fais l'action !",
+    challengesLegend:"🤝 Défis sur l'honneur — prends la photo, puis coche !",
     m1title:"Spotteur du jour", m1desc:"Poste un chat aujourd'hui",
     m2title:"Fan de félins", m2desc:"Like 3 chats aujourd'hui",
     m3title:"Témoin", m3desc:"Re-spotte un chat déjà signalé",
     m4title:"Photographe", m4desc:"Poste un chat avec une photo",
     m5title:"Explorateur", m5desc:"Poste un chat dans une nouvelle zone",
     m6title:"Social", m6desc:"Laisse un commentaire",
-    rareLabel:"✨ Rare",
-    todayLabel:"⚡ Auj.",
+    rareLabel:"✨ Rare", todayLabel:"⚡ Auj.",
+    pinLegendTitle:"Vu il y a", pinLegend1:"Moins d'1h", pinLegend2:"Aujourd'hui", pinLegend3:"Plus ancien",
+    feedGlobal:"🌍 Global", feedNearby:"📍 Près de moi", feedRefresh:"↻ Refresh",
+    sosTitle:"SOS Chats", sosSub:"Chats perdus, trouvés, et aide d'urgence",
+    sosAll:"Tous", sosLost:"🔴 Perdus", sosFound:"🟢 Trouvés",
+    sosBtn:"🐱 Signaler un chat perdu ou trouvé",
+    sosVets:"🏥 Vétérinaires proches", sosAnnonces:"📋 Annonces",
+    sosEmpty:"Aucune annonce pour le moment",
+    sosEmptySub:"Sois le premier à signaler un chat perdu ou trouvé",
+    sosModalTitle:"🐱 Signaler un chat",
+    sosTypeLost:"🔴 Chat perdu", sosTypeFound:"🟢 Chat trouvé",
+    sosPhotoTip:"Ajouter une photo",
+    sosName:"Nom du chat (si connu)",
+    sosDesc:"Description — couleur, signes distinctifs...",
+    sosContact:"Votre contact (tél ou email)",
+    sosPublish:"Publier l'annonce",
+    sosNoPartners:"Aucun partenaire vétérinaire pour le moment.",
+    sosBadgeLost:"🔴 Perdu", sosBadgeFound:"🟢 Trouvé",
+    editPseudo:"✏️ Modifier le pseudo",
+    editPseudoTitle:"✏️ Mon pseudo",
+    editPseudoSub:"Ce nom apparaît sur tes spots et commentaires.",
+    editPseudoPlaceholder:"Ton pseudo...",
+    editPseudoSave:"Enregistrer",
     authTitle:"Rejoins la communauté 🐾",
     authSub:"Connecte-toi pour sauvegarder ton profil, tes likes et tes badges.",
     googleBtn:"Continuer avec Google",
@@ -688,14 +711,37 @@ const T = {
     codLabel:"Cat of the Day", lang:"FR 🌍",
     missionsTitle:"🎯 Daily Missions",
     missionsReset:h=>"New missions in "+h+"h",
+    missionsLegend:"⚡ Auto missions — complete automatically when you do the action!",
+    challengesLegend:"🤝 Honor challenges — take the photo, then check it off!",
     m1title:"Daily Spotter", m1desc:"Post a cat today",
     m2title:"Cat Fan", m2desc:"Like 3 cats today",
     m3title:"Witness", m3desc:"Re-spot an already reported cat",
     m4title:"Photographer", m4desc:"Post a cat with a photo",
     m5title:"Explorer", m5desc:"Post a cat in a new area",
     m6title:"Social", m6desc:"Leave a comment",
-    rareLabel:"✨ Rare",
-    todayLabel:"⚡ Today",
+    rareLabel:"✨ Rare", todayLabel:"⚡ Today",
+    pinLegendTitle:"Spotted", pinLegend1:"Less than 1h ago", pinLegend2:"Today", pinLegend3:"Older",
+    feedGlobal:"🌍 Global", feedNearby:"📍 Near me", feedRefresh:"↻ Refresh",
+    sosTitle:"SOS Cats", sosSub:"Lost, found cats and emergency help",
+    sosAll:"All", sosLost:"🔴 Lost", sosFound:"🟢 Found",
+    sosBtn:"🐱 Report a lost or found cat",
+    sosVets:"🏥 Nearby vets", sosAnnonces:"📋 Listings",
+    sosEmpty:"No listings yet",
+    sosEmptySub:"Be the first to report a lost or found cat",
+    sosModalTitle:"🐱 Report a cat",
+    sosTypeLost:"🔴 Lost cat", sosTypeFound:"🟢 Found cat",
+    sosPhotoTip:"Add a photo",
+    sosName:"Cat's name (if known)",
+    sosDesc:"Description — color, distinctive signs...",
+    sosContact:"Your contact (phone or email)",
+    sosPublish:"Post listing",
+    sosNoPartners:"No vet partners yet.",
+    sosBadgeLost:"🔴 Lost", sosBadgeFound:"🟢 Found",
+    editPseudo:"✏️ Edit username",
+    editPseudoTitle:"✏️ My username",
+    editPseudoSub:"This name appears on your spots and comments.",
+    editPseudoPlaceholder:"Your username...",
+    editPseudoSave:"Save",
     authTitle:"Join the community 🐾",
     authSub:"Sign in to save your profile, likes and badges.",
     googleBtn:"Continue with Google",
@@ -1705,21 +1751,37 @@ async function publishSos(){
 window.publishSos = publishSos;
 
 async function resolveSos(id){
-  if(!confirm("Marquer comme résolu ?")) return;
-  await sb.from("lost_cats").update({resolved:true}).eq("id",id);
-  const a = sosAnnonces.find(x=>x.id===id);
-  if(a) a.resolved = true;
-  renderSos();
-  showToast("🎉 Super nouvelle !");
+  if(!confirm(lang==="fr"?"Marquer comme résolu et archiver ?":"Mark as resolved and archive?")) return;
+  await deleteSosFromDB(id);
 }
 window.resolveSos = resolveSos;
+
+async function deleteSos(id){
+  if(!confirm(lang==="fr"?"Supprimer cette annonce ?":"Delete this announcement?")) return;
+  await deleteSosFromDB(id);
+}
+window.deleteSos = deleteSos;
+
+async function deleteSosFromDB(id){
+  try {
+    const res = await fetch(`/api/delete-sos?id=${id}`, {method:"DELETE"});
+    if(!res.ok){
+      // Fallback direct
+      await sb.from("lost_cats").delete().eq("id", id);
+    }
+  } catch(e){ console.warn("deleteSos:", e); }
+  // Supprimer localement dans tous les cas
+  sosAnnonces = sosAnnonces.filter(a=>a.id!==id);
+  renderSos();
+  showToast("🗑️ "+(lang==="fr"?"Annonce supprimée":"Announcement deleted"));
+}
 
 function renderSos(){
   // Partenaires
   const pList = $("partners-list");
   if(pList){
     if(partners.length===0){
-      pList.innerHTML = `<div style="font-size:12px;color:var(--muted);padding:8px 0">Aucun partenaire vétérinaire pour le moment.</div>`;
+      pList.innerHTML = `<div style="font-size:12px;color:var(--muted);padding:8px 0">${t().sosNoPartners}</div>`;
     } else {
       pList.innerHTML = partners.map(p=>`
         <div class="partner-card${p.is_featured?" featured":""}">
@@ -1745,22 +1807,26 @@ function renderSos(){
     list.innerHTML=""; if(empty) empty.style.display="block"; return;
   }
   if(empty) empty.style.display="none";
-  list.innerHTML = filtered.map(a=>`
-    <div class="sos-card ${a.type}${a.resolved?" resolved":""}">
+  list.innerHTML = filtered.map(a=>{
+    const isMine = currentUser && a.posted_by===(currentUser.user_metadata?.full_name||currentUser.email?.split("@")[0]);
+    const canDelete = isAdmin() || isMine;
+    return `
+    <div class="sos-card ${a.type}">
       ${a.photo_url?`<img src="${a.photo_url}" style="width:100%;height:160px;object-fit:cover;border-radius:10px;margin-bottom:10px">`:""}
       <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
         <span class="sos-badge-${a.type}">${a.type==="lost"?"🔴 Perdu":"🟢 Trouvé"}</span>
-        ${a.resolved?`<span style="background:#F1F5F9;color:#64748B;font-size:10px;font-weight:800;padding:3px 8px;border-radius:20px">✅ Résolu</span>`:""}
         <span style="font-size:11px;color:var(--muted);margin-left:auto">${fmtAgo(a.created_at)}</span>
+        ${canDelete?`<button onclick="deleteSos('${a.id}')" style="background:#fee2e2;color:#dc2626;border:none;border-radius:8px;padding:4px 8px;font-size:11px;font-weight:700;cursor:pointer;font-family:'DM Sans',sans-serif">🗑️</button>`:""}
       </div>
       <div style="font-family:'Fraunces',serif;font-size:16px;font-weight:700">${a.name||"Chat inconnu"}</div>
       ${a.description?`<div style="font-size:13px;color:var(--mid);margin-top:4px">${a.description}</div>`:""}
-      <div style="font-size:12px;color:var(--muted);margin-top:6px">👤 ${a.posted_by} · 📍 ${a.lat&&a.lng?Math.round(getDistKm(a.lat,a.lng))+" km":"zone inconnue"}</div>
+      <div style="font-size:12px;color:var(--muted);margin-top:6px">👤 ${a.posted_by} · 📍 ${a.lat&&a.lng?Math.round(getDistKm(a.lat,a.lng)*10)/10+" km":"zone inconnue"}</div>
       <div style="display:flex;gap:8px;margin-top:10px">
         ${a.contact?`<a href="${a.contact.includes("@")?"mailto:":"tel:"}${a.contact}" style="flex:1;background:var(--terra);color:#fff;border-radius:10px;padding:9px;font-size:13px;font-weight:700;text-align:center;text-decoration:none">📞 Contacter</a>`:""}
-        ${!a.resolved&&currentUser&&a.posted_by===(currentUser.user_metadata?.full_name||currentUser.email?.split("@")[0])?`<button onclick="resolveSos('${a.id}')" style="flex:1;background:#F0FDF4;color:#16A34A;border:1.5px solid #BBF7D0;border-radius:10px;padding:9px;font-size:13px;font-weight:700;cursor:pointer;font-family:'DM Sans',sans-serif">✅ Résolu !</button>`:""}
+        ${isMine?`<button onclick="deleteSos('${a.id}')" style="flex:1;background:#F0FDF4;color:#16A34A;border:1.5px solid #BBF7D0;border-radius:10px;padding:9px;font-size:13px;font-weight:700;cursor:pointer;font-family:'DM Sans',sans-serif">✅ Résolu / Retirer</button>`:""}
       </div>
-    </div>`).join("");
+    </div>`;
+  }).join("");
 }
 
 function getDistKm(lat, lng){
@@ -2066,9 +2132,7 @@ function renderMissions(){
   const hoursLeft = 24 - now.getHours();
   const resetEl = $("missions-reset"); if(resetEl) resetEl.textContent = t().missionsReset(hoursLeft);
   wrap.innerHTML =
-    `<div style="font-size:11px;color:var(--muted);padding:0 2px 10px;line-height:1.5">
-      ⚡ <strong>Missions auto</strong> — se valident seules quand tu fais l'action !
-    </div>` +
+    `<div style="font-size:11px;color:var(--muted);padding:0 2px 10px;line-height:1.5">${t().missionsLegend}</div>` +
     missions.map(m=>{
       const done = progress.done.includes(m.key);
       const title = lang==="fr" ? m.titleFr : m.titleEn;
@@ -2164,9 +2228,7 @@ function renderChallenges(){
   const chList=$("ch-list");
   if(!chList) return;
   chList.innerHTML =
-    `<div style="font-size:11px;color:var(--muted);padding:6px 2px 10px;line-height:1.5">
-      🤝 <strong>Défis sur l'honneur</strong> — prends la photo, puis coche !
-    </div>` +
+    `<div style="font-size:11px;color:var(--muted);padding:6px 2px 10px;line-height:1.5">${t().challengesLegend}</div>` +
     challenges.map((c,i)=>
       `<div class='ch-card${c.done?" done":""}' onclick='toggleChallenge(${i})'>
         <span class='ch-emoji'>${c.emoji}</span>
@@ -2223,13 +2285,13 @@ function editPseudo(){
   modal.id = "pseudo-modal";
   modal.style.cssText = "position:fixed;inset:0;background:rgba(28,25,21,.65);z-index:300;display:flex;align-items:center;justify-content:center;padding:20px;backdrop-filter:blur(4px)";
   modal.innerHTML = `<div style="background:var(--light);border-radius:20px;padding:24px;width:100%;max-width:360px">
-    <div style="font-family:'Fraunces',serif;font-size:18px;font-weight:700;margin-bottom:6px">✏️ Mon pseudo</div>
-    <div style="font-size:12px;color:var(--muted);margin-bottom:16px">Ce nom apparaît sur tes spots et commentaires.</div>
-    <input id="pseudo-input" value="${current}" maxlength="30" placeholder="Ton pseudo..." style="width:100%;border:1.5px solid #E8E2DA;border-radius:12px;padding:12px 14px;font-size:15px;font-family:'DM Sans',sans-serif;box-sizing:border-box;outline:none"/>
-    <div style="font-size:11px;color:var(--muted);margin-top:6px;margin-bottom:16px">30 caractères max</div>
+    <div style="font-family:'Fraunces',serif;font-size:18px;font-weight:700;margin-bottom:6px">${t().editPseudoTitle}</div>
+    <div style="font-size:12px;color:var(--muted);margin-bottom:16px">${t().editPseudoSub}</div>
+    <input id="pseudo-input" value="${current}" maxlength="30" placeholder="${t().editPseudoPlaceholder}" style="width:100%;border:1.5px solid #E8E2DA;border-radius:12px;padding:12px 14px;font-size:15px;font-family:'DM Sans',sans-serif;box-sizing:border-box;outline:none"/>
+    <div style="font-size:11px;color:var(--muted);margin-top:6px;margin-bottom:16px">30 ${lang==="fr"?"caractères max":"chars max"}</div>
     <div style="display:flex;gap:8px">
-      <button onclick="document.getElementById('pseudo-modal').remove()" style="flex:1;padding:12px;border:1.5px solid #E8E2DA;border-radius:12px;background:#fff;font-size:14px;font-weight:700;color:var(--muted);cursor:pointer;font-family:'DM Sans',sans-serif">Annuler</button>
-      <button onclick="savePseudo()" style="flex:1;padding:12px;border:none;border-radius:12px;background:var(--terra);font-size:14px;font-weight:700;color:#fff;cursor:pointer;font-family:'DM Sans',sans-serif">Enregistrer</button>
+      <button onclick="document.getElementById('pseudo-modal').remove()" style="flex:1;padding:12px;border:1.5px solid #E8E2DA;border-radius:12px;background:#fff;font-size:14px;font-weight:700;color:var(--muted);cursor:pointer;font-family:'DM Sans',sans-serif">${t().cancel}</button>
+      <button onclick="savePseudo()" style="flex:1;padding:12px;border:none;border-radius:12px;background:var(--terra);font-size:14px;font-weight:700;color:#fff;cursor:pointer;font-family:'DM Sans',sans-serif">${t().editPseudoSave}</button>
     </div>
   </div>`;
   modal.addEventListener("click", e=>{ if(e.target===modal) modal.remove(); });
@@ -2437,12 +2499,24 @@ function applyLang(){
   $("nav-feed").textContent=t().feed;
   $("nav-ch").textContent=t().challenges;
   $("nav-profile").textContent=t().profile;
+  const navSos=$("nav-sos"); if(navSos) navSos.textContent="SOS";
   $("cod-label").textContent=t().codLabel;
   $("map-empty-text").innerHTML=t().mapEmpty;
+  // Légende map
+  const plt=$("pin-legend-title"); if(plt) plt.textContent=t().pinLegendTitle;
+  const pl1=$("pin-legend-1"); if(pl1) pl1.textContent=t().pinLegend1;
+  const pl2=$("pin-legend-2"); if(pl2) pl2.textContent=t().pinLegend2;
+  const pl3=$("pin-legend-3"); if(pl3) pl3.textContent=t().pinLegend3;
+  // Feed
+  const fg=$("feed-filter-global"); if(fg) fg.textContent=t().feedGlobal;
+  const fn=$("feed-filter-nearby"); if(fn) fn.textContent=t().feedNearby;
+  // Bouton modifier pseudo
+  const ep=$("edit-pseudo-btn"); if(ep) ep.textContent=t().editPseudo;
   updateAuthUI();
   if(currentTab==="feed") renderFeed();
   if(currentTab==="challenges") renderChallenges();
   if(currentTab==="profile") renderProfile();
+  if(currentTab==="sos") renderSos();
   if(selectedCat) openPopup(selectedCat);
 }
 
