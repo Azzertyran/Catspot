@@ -887,20 +887,22 @@ async function loadUserLikes(){
 }
 
 async function saveCat(catData){
-  const doInsert = ()=>sb.from("cats").insert([catData]).select().single();
-  for(let attempt=1; attempt<=2; attempt++){
-    try {
-      const timeout = new Promise((_,reject)=>setTimeout(()=>reject(new Error("Timeout")), 30000));
-      const {data,error} = await Promise.race([doInsert(), timeout]);
-      if(error){ showToast("❌ "+error.message); return null; }
-      return data;
-    } catch(e){
-      if(attempt===2){ showToast("❌ "+(e.message||"Erreur réseau — réessaie")); return null; }
-      showToast("⏳ Tentative 2...");
-      await new Promise(r=>setTimeout(r,2000));
+  try {
+    showToast("📡 Connexion Supabase...");
+    const result = await sb.from("cats").insert([catData]).select().single();
+    if(result.error){
+      showToast("❌ "+result.error.message);
+      return null;
     }
+    if(!result.data){
+      showToast("❌ Pas de réponse");
+      return null;
+    }
+    return result.data;
+  } catch(e){
+    showToast("❌ Exception: "+(e?.message||String(e)));
+    return null;
   }
-  return null;
 }
 
 async function toggleLikeDB(catId, wasLiked){
@@ -2034,9 +2036,6 @@ async function _doPublish(){
   const posted_by = currentUser?.user_metadata?.full_name
     || currentUser?.email?.split("@")[0]
     || (lang==="fr"?"Anonyme":"Anonymous");
-
-  showToast("📡 Envoi...");
-  console.log("Publication: lat=", newLat, "lng=", newLng, "name=", name);
 
   const saved = await saveCat({
     name: String(name),
