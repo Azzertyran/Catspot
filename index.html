@@ -61,13 +61,38 @@ input:focus,textarea:focus{outline:none}
 .cat-pin.legend::after{content:"⭐";position:absolute;top:-5px;right:-5px;font-size:10px;pointer-events:none;line-height:1}
 
 /* Cat of day - caché par défaut */
-#cod-banner{position:absolute;top:12px;left:12px;background:rgba(249,246,240,0.96);backdrop-filter:blur(10px);border-radius:14px;padding:9px 13px;display:none;align-items:center;gap:10px;box-shadow:0 2px 16px rgba(0,0,0,0.12);z-index:5;border:1px solid rgba(0,0,0,0.06);max-width:210px;pointer-events:auto;cursor:pointer;transition:transform .15s,box-shadow .15s}
+#cod-banner{position:absolute;top:12px;left:12px;background:rgba(249,246,240,0.97);backdrop-filter:blur(10px);border-radius:16px;padding:0;display:none;align-items:center;gap:0;box-shadow:0 2px 20px rgba(0,0,0,0.15);z-index:5;border:1px solid rgba(0,0,0,0.07);max-width:230px;pointer-events:auto;cursor:pointer;transition:transform .15s,box-shadow .15s;overflow:hidden}
 #cod-banner.visible{display:flex}
-#cod-banner:hover{transform:scale(1.03);box-shadow:0 4px 22px rgba(0,0,0,0.18)}
-.cod-star{font-size:22px}
+#cod-banner:hover{transform:scale(1.03);box-shadow:0 4px 22px rgba(0,0,0,0.2)}
+#cod-photo{width:62px;height:62px;flex-shrink:0;background:var(--warm);display:flex;align-items:center;justify-content:center;font-size:28px}
+#cod-photo img{width:62px;height:62px;object-fit:cover}
+#cod-info{padding:9px 11px}
 .cod-label{font-size:9px;font-weight:700;color:var(--amber);text-transform:uppercase;letter-spacing:.8px}
-.cod-name{font-family:"Fraunces",serif;font-size:14px;font-weight:700;color:var(--dark)}
-.cod-likes{font-size:11px;color:var(--muted);margin-top:1px}
+.cod-name{font-family:"Fraunces",serif;font-size:13px;font-weight:700;color:var(--dark);margin-top:1px}
+.cod-likes{font-size:11px;color:var(--muted);margin-top:2px}
+#cod-banner.mine .cod-label{color:var(--terra)}
+
+/* Badge rare */
+.badge-rare{display:inline-flex;align-items:center;gap:3px;background:linear-gradient(135deg,#7C3AED,#A78BFA);color:#fff;font-size:9px;font-weight:800;padding:2px 7px;border-radius:20px;text-transform:uppercase;letter-spacing:.5px}
+.feed-rare{margin:6px 14px 0;display:flex;gap:6px;flex-wrap:wrap}
+
+/* Missions quotidiennes */
+.mission-card{background:linear-gradient(135deg,#1C1915,#2E2820);border-radius:16px;padding:16px;display:flex;align-items:center;gap:14px;cursor:pointer;transition:transform .15s}
+.mission-card:active{transform:scale(.98)}
+.mission-card.done{background:linear-gradient(135deg,#052e16,#14532d)}
+.mission-icon{font-size:28px;flex-shrink:0}
+.mission-title{font-size:14px;font-weight:700;color:#fff}
+.mission-desc{font-size:11px;color:rgba(255,255,255,.55);margin-top:2px}
+.mission-pts{font-size:12px;font-weight:800;color:var(--amber);margin-top:3px}
+.mission-check{width:28px;height:28px;border-radius:50%;background:rgba(255,255,255,.12);display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;margin-left:auto}
+.mission-check.done{background:#22c55e}
+.missions-reset{font-size:11px;color:var(--muted);text-align:center;margin-top:6px}
+
+/* Chat du jour — badge ⚡ sur posts du jour */
+.feed-today-badge{display:inline-flex;align-items:center;gap:3px;background:linear-gradient(135deg,#E8541A,#F59E0B);color:#fff;font-size:9px;font-weight:800;padding:2px 7px;border-radius:20px}
+
+/* Partage */
+.share-btn{display:flex;align-items:center;gap:5px;background:var(--warm);border:none;border-radius:20px;padding:7px 14px;font-size:12px;font-weight:700;color:var(--mid);cursor:pointer;font-family:'DM Sans',sans-serif}
 
 /* Empty map state */
 #map-empty{position:absolute;top:50%;left:50%;transform:translate(-50%,-55%);text-align:center;pointer-events:none;z-index:4;display:none}
@@ -263,8 +288,8 @@ input:focus,textarea:focus{outline:none}
       <div id="maplibre"></div>
       <div id="map">
         <div id="cod-banner">
-          <span class="cod-star">⭐</span>
-          <div>
+          <div id="cod-photo">🐱</div>
+          <div id="cod-info">
             <div class="cod-label" id="cod-label">Chat du jour</div>
             <div class="cod-name serif" id="cod-name"></div>
             <div class="cod-likes" id="cod-likes"></div>
@@ -308,6 +333,7 @@ input:focus,textarea:focus{outline:none}
             <div style="display:flex;gap:8px;margin-top:12px">
               <button id="popup-respott-btn" style="flex:1;background:var(--terra);color:#fff;border:none;border-radius:12px;padding:10px;font-size:13px;font-weight:700;cursor:pointer;font-family:'DM Sans',sans-serif">🐾 Je l'ai vu !</button>
               <button id="popup-comment-btn" style="flex:1;background:var(--warm);color:var(--dark);border:none;border-radius:12px;padding:10px;font-size:12px;font-weight:700;cursor:pointer;font-family:'DM Sans',sans-serif">💬 Commenter</button>
+              <button id="popup-share-btn" style="background:var(--warm);color:var(--dark);border:none;border-radius:12px;padding:10px 14px;font-size:13px;cursor:pointer;font-family:'DM Sans',sans-serif">🔗</button>
               <button id="popup-report-btn" style="background:#fee2e2;color:#dc2626;border:none;border-radius:12px;padding:10px 14px;font-size:13px;cursor:pointer;font-family:'DM Sans',sans-serif">🚩</button>
             </div>
           </div>
@@ -321,8 +347,8 @@ input:focus,textarea:focus{outline:none}
       <!-- Header feed avec filtres -->
       <div style="position:sticky;top:0;z-index:5;background:var(--light);padding:10px 14px 8px;border-bottom:1px solid #f0ece6;display:flex;align-items:center;justify-content:space-between">
         <div style="display:flex;gap:6px">
-          <button id="feed-filter-global" class="feed-filter-btn active" onclick="setFeedFilter('global')">🌍 Global</button>
-          <button id="feed-filter-nearby" class="feed-filter-btn" onclick="setFeedFilter('nearby')">📍 Près de moi</button>
+          <button id="feed-filter-global" class="feed-filter-btn" onclick="setFeedFilter('global')">🌍 Global</button>
+          <button id="feed-filter-nearby" class="feed-filter-btn active" onclick="setFeedFilter('nearby')">📍 Près de moi</button>
         </div>
         <button onclick="refreshFeed()" style="background:var(--warm);border:none;border-radius:20px;padding:6px 12px;font-size:12px;font-weight:700;color:var(--mid);cursor:pointer;font-family:'DM Sans',sans-serif">↻ Refresh</button>
       </div>
@@ -339,6 +365,12 @@ input:focus,textarea:focus{outline:none}
             <div class="pts-sub" id="pts-label">Tes points</div>
             <div class="pts-week" id="pts-week">Cette semaine</div>
           </div>
+        </div>
+        <!-- Missions du jour -->
+        <div>
+          <div class="section-title" id="missions-title">🎯 Missions du jour</div>
+          <div id="missions-list" style="display:flex;flex-direction:column;gap:10px"></div>
+          <div class="missions-reset" id="missions-reset"></div>
         </div>
         <div>
           <div class="section-title" id="ch-section-title">Défis</div>
@@ -497,6 +529,16 @@ const T = {
     badge3:"Chasseur de Roux", badge4:"Légende Locale",
     badge5:"Noctambule", badge6:"Explorateur",
     codLabel:"Chat du jour", lang:"EN 🌍",
+    missionsTitle:"🎯 Missions du jour",
+    missionsReset:h=>"Nouvelles missions dans "+h+"h",
+    m1title:"Spotteur du jour", m1desc:"Poste un chat aujourd'hui",
+    m2title:"Fan de félins", m2desc:"Like 3 chats aujourd'hui",
+    m3title:"Témoin", m3desc:"Re-spotte un chat déjà signalé",
+    m4title:"Photographe", m4desc:"Poste un chat avec une photo",
+    m5title:"Explorateur", m5desc:"Poste un chat dans une nouvelle zone",
+    m6title:"Social", m6desc:"Laisse un commentaire",
+    rareLabel:"✨ Rare",
+    todayLabel:"⚡ Aujourd'hui",
     authTitle:"Rejoins la communauté 🐾",
     authSub:"Connecte-toi pour sauvegarder ton profil, tes likes et tes badges.",
     googleBtn:"Continuer avec Google",
@@ -537,6 +579,16 @@ const T = {
     badge3:"Ginger Hunter", badge4:"Local Legend",
     badge5:"Night Owl", badge6:"Explorer",
     codLabel:"Cat of the Day", lang:"FR 🌍",
+    missionsTitle:"🎯 Daily Missions",
+    missionsReset:h=>"New missions in "+h+"h",
+    m1title:"Daily Spotter", m1desc:"Post a cat today",
+    m2title:"Cat Fan", m2desc:"Like 3 cats today",
+    m3title:"Witness", m3desc:"Re-spot an already reported cat",
+    m4title:"Photographer", m4desc:"Post a cat with a photo",
+    m5title:"Explorer", m5desc:"Post a cat in a new area",
+    m6title:"Social", m6desc:"Leave a comment",
+    rareLabel:"✨ Rare",
+    todayLabel:"⚡ Today",
     authTitle:"Join the community 🐾",
     authSub:"Sign in to save your profile, likes and badges.",
     googleBtn:"Continue with Google",
@@ -953,13 +1005,23 @@ function addCatMarker(cat){
 
 function updateCatOfDay(){
   if(!cats.length){$("cod-banner").classList.remove("visible");return;}
-  // Trier par likes_count local (mis à jour à chaque toggle)
   const sorted = [...cats].sort((a,b)=>(b.likes_count||0)-(a.likes_count||0));
   const best = sorted[0];
   if((best.likes_count||0)===0){$("cod-banner").classList.remove("visible");return;}
   $("cod-label").textContent = t().codLabel;
   $("cod-name").textContent = best.name || "Inconnu";
-  $("cod-likes").textContent = (best.likes_count||0) + " " + t().likes;
+  $("cod-likes").textContent = "❤️ "+(best.likes_count||0)+" likes";
+  // Photo miniature
+  const photoEl = $("cod-photo");
+  if(best.photo_url){
+    photoEl.innerHTML = `<img src="${best.photo_url}" alt="">`;
+  } else {
+    photoEl.innerHTML = "🐱";
+  }
+  // Badge "mon chat"
+  const isMine = currentUser && best.posted_by === (currentUser.user_metadata?.full_name || currentUser.email?.split("@")[0]);
+  $("cod-banner").classList.toggle("mine", !!isMine);
+  if(isMine) $("cod-label").textContent = "⭐ " + t().codLabel + " — c'est ton chat !";
   $("cod-banner").classList.add("visible");
   $("cod-banner").onclick = ()=>{
     const color = getCatPinColor(best);
@@ -1179,7 +1241,7 @@ function showUserProfile(poster){
 window.showUserProfile = showUserProfile;
 
 // ── FILTRE FEED ───────────────────────────────────────────────
-let feedFilter = "global";
+let feedFilter = "nearby"; // Local par défaut — plus engageant
 
 function setFeedFilter(filter){
   feedFilter = filter;
@@ -1229,6 +1291,7 @@ async function reSpot(catId){
     const poster=cat.posted_by||(lang==="fr"?"Anonyme":"Anonymous");
     $("popup-meta").textContent="Par "+poster+" · "+t().sightings(cat.sightings)+" · "+fmtAgo(cat.created_at||new Date().toISOString());
     showToast("🐾 "+(lang==="fr"?"Signalement ajouté !":"Sighting added!"));
+    completeMission("respot");
     if(currentTab==="feed") renderFeed();
   } catch(e){ showToast("❌ Erreur"); }
 }
@@ -1305,6 +1368,7 @@ async function postComment(catId){
     await sb.from("comments").insert([{cat_id:catId,text,author}]);
     // Mettre à jour le compteur local
     commentCounts[catId] = (commentCounts[catId]||0)+1;
+    completeMission("comment");
     // Mettre à jour le bouton dans le feed sans re-render complet
     const feedBtn = document.querySelector(`button[onclick="showComments('${catId}')"]`);
     if(feedBtn){
@@ -1417,11 +1481,15 @@ function renderFeed(append=false){
     const ownerBtns=isOwner?`<button onclick="editCat('${cat.id}')" style="background:var(--warm);border:none;border-radius:8px;padding:4px 8px;font-size:11px;font-weight:700;color:var(--mid);cursor:pointer;font-family:'DM Sans',sans-serif">✏️</button>
       <button onclick="deleteCat('${cat.id}')" style="background:#fee2e2;border:none;border-radius:8px;padding:4px 8px;font-size:11px;font-weight:700;color:#dc2626;cursor:pointer;font-family:'DM Sans',sans-serif">🗑️</button>`:"";
     const adminBtn=isAdmin()&&!isOwner?`<button onclick="deleteCat('${cat.id}')" style="margin-left:auto;background:#fee2e2;border:none;border-radius:8px;padding:4px 10px;font-size:11px;font-weight:700;color:#dc2626;cursor:pointer;font-family:'DM Sans',sans-serif">🗑️</button>`:"";
+    const isRare = isCatRare(cat);
+    const isToday = cat.created_at && new Date(cat.created_at).toISOString().split("T")[0] === getTodayKey();
+    const badges = (isRare ? `<span class="badge-rare">${t().rareLabel}</span>` : "") +
+                   (isToday ? `<span class="feed-today-badge">${t().todayLabel}</span>` : "");
     return `<div class='feed-card'>
       <div class='feed-head'>
         <div class='feed-avatar' style='background:${color}22;border-color:${color}'>${cat.emoji||"🐱"}</div>
         <div style="flex:1;min-width:0">
-          <div class='feed-catname serif'>${cat.name||"Chat inconnu"}</div>
+          <div class='feed-catname serif'>${cat.name||"Chat inconnu"} ${badges}</div>
           <div class='feed-meta'>Par <strong style="cursor:pointer;text-decoration:underline;color:var(--terra)" onclick="showUserProfile('${poster}')">${poster}</strong> · ${fmtAgo(cat.created_at||new Date().toISOString())} · ${t().sightings(cat.sightings||1)}</div>
         </div>
         <div style="display:flex;gap:4px;align-items:center;flex-shrink:0">${ownerBtns}${adminBtn}</div>
@@ -1435,6 +1503,7 @@ function renderFeed(append=false){
         <button onclick="showComments('${cat.id}')" style="background:none;border:none;font-size:13px;color:${(commentCounts[cat.id]||0)>0?"var(--terra)":"var(--muted)"};cursor:pointer;font-family:'DM Sans',sans-serif;font-weight:600;display:flex;align-items:center;gap:4px">
           💬 ${(commentCounts[cat.id]||0)>0 ? commentCounts[cat.id]+" commentaire"+(commentCounts[cat.id]>1?"s":"") : (lang==="fr"?"Commenter":"Comment")}
         </button>
+        <button onclick="shareCat(cats.find(c=>c.id==='${cat.id}'))" class="share-btn">🔗</button>
       </div>
     </div>`;
   }).join("");
@@ -1472,6 +1541,9 @@ function toggleFeedLike(id){
   if(selectedCat?.id===id){ selectedCat.likes_count = cat.likes_count; updatePopupLike(selectedCat); }
   saveLikesToStorage();
   updateCatOfDay();
+  // Vérifier mission like3 : 3 likes aujourd'hui
+  const todayLikes = Object.keys(likes).filter(k=>likes[k]).length;
+  if(likes[id] && todayLikes >= 3) completeMission("like3");
   toggleLikeDB(id, wasLiked);
 }
 
@@ -1536,15 +1608,143 @@ async function loadChallengesForUser(){
   } catch(e){}
 }
 
+// ── MISSIONS QUOTIDIENNES ─────────────────────────────────────
+const ALL_MISSIONS = [
+  {key:"m1", emoji:"📸", pts:40, type:"post"},
+  {key:"m2", emoji:"❤️", pts:20, type:"like3"},
+  {key:"m3", emoji:"🐾", pts:30, type:"respot"},
+  {key:"m4", emoji:"📷", pts:50, type:"photo"},
+  {key:"m5", emoji:"🧭", pts:35, type:"newzone"},
+  {key:"m6", emoji:"💬", pts:25, type:"comment"},
+];
+
+function getTodayKey(){
+  return new Date().toISOString().split("T")[0]; // "2025-04-26"
+}
+
+function getDailyMissions(){
+  // 3 missions déterministes basées sur la date — mêmes pour tous les users
+  const today = getTodayKey();
+  const seed = today.replace(/-/g,"");
+  const idx = [
+    parseInt(seed) % ALL_MISSIONS.length,
+    (parseInt(seed)+2) % ALL_MISSIONS.length,
+    (parseInt(seed)+4) % ALL_MISSIONS.length,
+  ];
+  return idx.map(i => ALL_MISSIONS[i]);
+}
+
+function loadMissionsProgress(){
+  try {
+    const saved = JSON.parse(localStorage.getItem("catspot_missions")||"{}");
+    // Reset si nouveau jour
+    if(saved.day !== getTodayKey()) return {day: getTodayKey(), done: []};
+    return saved;
+  } catch(e){ return {day: getTodayKey(), done: []}; }
+}
+
+function saveMissionsProgress(progress){
+  try { localStorage.setItem("catspot_missions", JSON.stringify(progress)); } catch(e){}
+}
+
+function completeMission(type){
+  const missions = getDailyMissions();
+  const mission = missions.find(m=>m.type===type);
+  if(!mission) return;
+  const progress = loadMissionsProgress();
+  if(progress.done.includes(mission.key)) return;
+  progress.done.push(mission.key);
+  saveMissionsProgress(progress);
+  showToast(`🎯 Mission accomplie ! +${mission.pts} pts`);
+  renderMissions();
+}
+
+function renderMissions(){
+  const missions = getDailyMissions();
+  const progress = loadMissionsProgress();
+  const wrap = $("missions-list");
+  if(!wrap) return;
+  $("missions-title").textContent = t().missionsTitle;
+  // Calcul heure reset
+  const now = new Date();
+  const hoursLeft = 24 - now.getHours();
+  if($("missions-reset")) $("missions-reset").textContent = t().missionsReset(hoursLeft);
+  wrap.innerHTML = missions.map(m=>{
+    const done = progress.done.includes(m.key);
+    return `<div class="mission-card${done?" done":""}" onclick="toggleMission('${m.key}')">
+      <span class="mission-icon">${m.emoji}</span>
+      <div style="flex:1">
+        <div class="mission-title">${t()[m.key+"title"]||m.key}</div>
+        <div class="mission-desc">${t()[m.key+"desc"]||""}</div>
+        <div class="mission-pts">+${m.pts} pts</div>
+      </div>
+      <div class="mission-check${done?" done":""}">${done?"✓":"○"}</div>
+    </div>`;
+  }).join("");
+}
+
+function toggleMission(key){
+  if(!currentUser){showToast("🔒 Connecte-toi pour valider les missions");return;}
+  const progress = loadMissionsProgress();
+  if(progress.done.includes(key)){
+    progress.done = progress.done.filter(k=>k!==key);
+  } else {
+    progress.done.push(key);
+    const m = ALL_MISSIONS.find(x=>x.key===key);
+    if(m) showToast(`🎯 Mission validée ! +${m.pts} pts`);
+  }
+  saveMissionsProgress(progress);
+  renderMissions();
+}
+window.toggleMission = toggleMission;
+
+// ── BADGE RARE ────────────────────────────────────────────────
+function isCatRare(cat){
+  // Rare si seul chat dans un rayon de 500m
+  const R = 6371000;
+  const nearby = cats.filter(c=>{
+    if(c.id === cat.id) return false;
+    const dLat = (c.lat-cat.lat)*Math.PI/180;
+    const dLng = (c.lng-cat.lng)*Math.PI/180;
+    const a = Math.sin(dLat/2)**2 + Math.cos(cat.lat*Math.PI/180)*Math.cos(c.lat*Math.PI/180)*Math.sin(dLng/2)**2;
+    return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a)) < 500;
+  });
+  return nearby.length === 0;
+}
+
+// ── PARTAGE NATIF ─────────────────────────────────────────────
+async function shareCat(cat){
+  const text = lang==="fr"
+    ? `🐱 J'ai spotté "${cat.name||"un chat"}" sur Catspot ! Viens voir les chats de ton quartier 🗺️`
+    : `🐱 I spotted "${cat.name||"a cat"}" on Catspot! Come see the cats in your neighborhood 🗺️`;
+  const url = "https://catspot-gray.vercel.app";
+  if(navigator.share){
+    try {
+      await navigator.share({title:"Catspot 🐱", text, url});
+    } catch(e){ if(e.name!=="AbortError") fallbackShare(text+" "+url); }
+  } else {
+    fallbackShare(text+" "+url);
+  }
+}
+
+function fallbackShare(text){
+  if(navigator.clipboard){
+    navigator.clipboard.writeText(text).then(()=>showToast("🔗 Lien copié !"));
+  } else {
+    showToast("🔗 "+text.substring(0,40)+"...");
+  }
+}
+window.shareCat = shareCat;
+
 function renderChallenges(){
   $("pts-total").textContent=totalPts();
   $("pts-label").textContent=t().yourPts;
   $("pts-week").textContent=t().thisWeek;
   $("ch-section-title").textContent=t().chSection;
+  renderMissions();
   $("ch-list").innerHTML=challenges.map((c,i)=>
     "<div class='ch-card"+(c.done?" done":"")+"' onclick='toggleChallenge("+i+")'><span class='ch-emoji'>"+c.emoji+"</span><div><div class='ch-title'>"+t()[c.key]+"</div><div class='ch-pts'>+"+c.pts+" pts</div></div><div class='ch-status' style='background:"+(c.done?"#4ADE80":"#F1F5F9")+";color:"+(c.done?"#fff":"#94A3B8")+"'>"+(c.done?"✓":"○")+"</div></div>"
   ).join("");
-  // Badges uniquement dans le profil — pas dans défis
 }
 
 function toggleChallenge(i){
@@ -1733,6 +1933,9 @@ async function publishSpot(){
 
   cats.unshift(cat);
   userProfile.totalCats = (userProfile.totalCats||0) + 1;
+  // Missions automatiques
+  completeMission("post");
+  if(file) completeMission("photo");
   // Supprimer le pin manuel temporaire
   if(manualPinMarker){ manualPinMarker.remove(); manualPinMarker=null; }
   closeModal();
@@ -1952,6 +2155,7 @@ $("popup-like-btn").addEventListener("click",async ()=>{
 });
 $("popup-respott-btn").addEventListener("click",(e)=>{ e.stopPropagation(); if(selectedCat) reSpot(selectedCat.id); });
 $("popup-comment-btn").addEventListener("click",(e)=>{ e.stopPropagation(); if(selectedCat) showComments(selectedCat.id); });
+$("popup-share-btn").addEventListener("click",(e)=>{ e.stopPropagation(); if(selectedCat) shareCat(selectedCat); });
 $("popup-report-btn").addEventListener("click",(e)=>{ e.stopPropagation(); if(selectedCat) reportCat(selectedCat.id); });
 document.querySelectorAll(".nav-btn").forEach(b=>b.addEventListener("click",()=>switchTab(b.dataset.tab)));
 $("pro-btn").addEventListener("click",()=>showToast("🚀 Bientôt disponible !"));
@@ -2034,6 +2238,7 @@ if(navigator.geolocation){
   // Lancer la carte IMMÉDIATEMENT — pas d'attente
   loadChallengesFromStorage();
   loadLikesFromStorage();
+  renderMissions();
   initMap();
   renderChallenges();
   renderProfile();
