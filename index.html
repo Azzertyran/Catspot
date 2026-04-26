@@ -1077,10 +1077,10 @@ async function saveCat(catData){
   }
 }
 
-let likeInProgress = new Set(); // Verrou par cat ID
+let likeInProgress = new Set();
 
 async function toggleLikeDB(catId, wasLiked){
-  if(likeInProgress.has(catId)) return; // Verrou — ignorer si déjà en cours
+  if(likeInProgress.has(catId)) return;
   likeInProgress.add(catId);
   try {
     if(!isRealUser()){
@@ -1090,28 +1090,12 @@ async function toggleLikeDB(catId, wasLiked){
       localStorage.setItem("catspot_pending_likes", JSON.stringify(pending));
       return;
     }
-    // Utiliser upsert/delete sur la table likes — le count se recalcule proprement
     await fetch("/api/like", {
-      method: wasLiked ? "DELETE" : "POST",
+      method: "POST",
       headers: {"Content-Type":"application/json"},
       body: JSON.stringify({cat_id:catId, user_id:currentUser.id, was_liked:wasLiked})
     });
-    // Recharger le vrai likes_count depuis Supabase après l'opération
-    setTimeout(async ()=>{
-      try {
-        const {data} = await sb.from("cats").select("likes_count").eq("id",catId).single();
-        if(data){
-          const cat = cats.find(c=>c.id===catId);
-          if(cat) cat.likes_count = data.likes_count;
-          // Mettre à jour l'affichage
-          const btn = $("fl-"+catId);
-          if(btn) btn.innerHTML = (likes[catId]?"❤️":"🤍")+" "+t().likes(data.likes_count||0);
-          if(selectedCat?.id===catId) updatePopupLike({...selectedCat, likes_count:data.likes_count});
-          updateCatOfDay();
-        }
-      } catch(e){}
-    }, 1000);
-  } catch(e){ console.error("toggleLikeDB:", e); }
+  } catch(e){}
   finally { likeInProgress.delete(catId); }
 }
 
