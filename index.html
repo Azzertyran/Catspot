@@ -45,9 +45,9 @@ input:focus,textarea:focus{outline:none}
 
 /* TABS */
 #tabs{flex:1;position:relative;min-height:0;overflow:hidden}
-.tab-panel{position:absolute;inset:0;overflow-y:auto;overflow-x:hidden;display:none;padding-bottom:calc(var(--nav) + 32px)}
+.tab-panel{position:absolute;inset:0;overflow-y:auto;overflow-x:hidden;display:none;padding-bottom:calc(var(--nav) + 32px);contain:strict}
 .tab-panel.active{display:block}
-#tab-map{padding:0;display:none}
+#tab-map{padding:0;display:none;contain:strict}
 #tab-map.active{display:flex;flex-direction:column;position:absolute;inset:0}
 
 /* MAP */
