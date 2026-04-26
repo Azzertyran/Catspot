@@ -347,8 +347,8 @@ input:focus,textarea:focus{outline:none}
       <!-- Header feed avec filtres -->
       <div style="position:sticky;top:0;z-index:5;background:var(--light);padding:10px 14px 8px;border-bottom:1px solid #f0ece6;display:flex;align-items:center;justify-content:space-between">
         <div style="display:flex;gap:6px">
-          <button id="feed-filter-global" class="feed-filter-btn" onclick="setFeedFilter('global')">🌍 Global</button>
-          <button id="feed-filter-nearby" class="feed-filter-btn active" onclick="setFeedFilter('nearby')">📍 Près de moi</button>
+          <button id="feed-filter-global" class="feed-filter-btn active" onclick="setFeedFilter('global')">🌍 Global</button>
+          <button id="feed-filter-nearby" class="feed-filter-btn" onclick="setFeedFilter('nearby')">📍 Près de moi</button>
         </div>
         <button onclick="refreshFeed()" style="background:var(--warm);border:none;border-radius:20px;padding:6px 12px;font-size:12px;font-weight:700;color:var(--mid);cursor:pointer;font-family:'DM Sans',sans-serif">↻ Refresh</button>
       </div>
@@ -741,15 +741,24 @@ async function initAuth(){
 }
 
 async function signInWithGoogle(){
-  // Nettoyer l'URL avant le redirect (évite les conflits avec les hash OAuth)
-  const redirectTo = window.location.origin + window.location.pathname;
-  await sb.auth.signInWithOAuth({
-    provider:"google",
-    options:{
-      redirectTo,
-      queryParams:{prompt:"select_account"}, // Force le choix de compte Google
+  try {
+    const redirectTo = window.location.origin + window.location.pathname;
+    console.log("signInWithGoogle: redirectTo=", redirectTo);
+    const {error} = await sb.auth.signInWithOAuth({
+      provider:"google",
+      options:{
+        redirectTo,
+        queryParams:{prompt:"select_account"},
+      }
+    });
+    if(error){
+      console.error("signInWithGoogle erreur:", error);
+      showToast("❌ Erreur connexion: "+error.message);
     }
-  });
+  } catch(e){
+    console.error("signInWithGoogle exception:", e);
+    showToast("❌ Erreur: "+e.message);
+  }
 }
 
 async function signOut(){
@@ -1273,7 +1282,7 @@ function showUserProfile(poster){
 window.showUserProfile = showUserProfile;
 
 // ── FILTRE FEED ───────────────────────────────────────────────
-let feedFilter = "nearby"; // Local par défaut — plus engageant
+let feedFilter = "global"; // Global par défaut — évite feed vide si géoloc lente
 
 function setFeedFilter(filter){
   feedFilter = filter;
@@ -2289,11 +2298,22 @@ if(navigator.geolocation){
 }
 
 (async()=>{
-  // Géoloc non bloquante
+  // Géoloc non bloquante — quand elle arrive, switcher en nearby automatiquement
   if(navigator.geolocation){
     navigator.geolocation.getCurrentPosition(
-      p=>{ userLat=p.coords.latitude; userLng=p.coords.longitude; if(mapInstance) mapInstance.setCenter([userLng,userLat]); },
-      ()=>{}, {timeout:3000, maximumAge:60000}
+      p=>{
+        userLat=p.coords.latitude; userLng=p.coords.longitude;
+        if(mapInstance) mapInstance.setCenter([userLng,userLat]);
+        // Maintenant qu'on a la position, passer en nearby et re-render
+        if(feedFilter==="global"){
+          feedFilter="nearby";
+          const gb=$("feed-filter-global"), nb=$("feed-filter-nearby");
+          if(gb) gb.classList.remove("active");
+          if(nb) nb.classList.add("active");
+          if(currentTab==="feed") renderFeed();
+        }
+      },
+      ()=>{}, {timeout:4000, maximumAge:60000}
     );
   }
 
