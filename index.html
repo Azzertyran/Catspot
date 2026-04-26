@@ -2049,10 +2049,10 @@ function completeMission(type){
 }
 
 function renderMissions(){
+  const wrap = $("missions-list");
+  if(!wrap) return; // Guard — onglet pas dans le DOM actif
   const missions = getDailyMissions();
   const progress = loadMissionsProgress();
-  const wrap = $("missions-list");
-  if(!wrap) return;
   const titleEl = $("missions-title"); if(titleEl) titleEl.textContent = t().missionsTitle;
   const now = new Date();
   const hoursLeft = 24 - now.getHours();
@@ -2703,10 +2703,7 @@ if(navigator.geolocation){
   // Lancer la carte IMMÉDIATEMENT — pas d'attente
   loadChallengesFromStorage();
   loadLikesFromStorage();
-  renderMissions();
   initMap();
-  renderChallenges();
-  renderProfile();
 
   // 2. Auth + données en arrière-plan, sans bloquer l'affichage
   try {
