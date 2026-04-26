@@ -146,7 +146,7 @@ input:focus,textarea:focus{outline:none}
 .feed-photo img{width:100%;max-height:320px;object-fit:contain;display:block;position:relative;z-index:1}
 .feed-photo-gradient{position:absolute;inset:0;pointer-events:none}
 .feed-photo-emoji{font-size:76px;padding:40px 0;position:relative;z-index:1}
-.feed-photo-loc{position:absolute;bottom:10px;left:12px;background:rgba(0,0,0,.55);color:#fff;font-size:11px;font-weight:600;padding:4px 10px;border-radius:20px;backdrop-filter:blur(4px);z-index:2}
+.feed-photo-loc{position:absolute;bottom:8px;left:10px;background:rgba(0,0,0,.38);color:rgba(255,255,255,.75);font-size:9px;font-weight:600;padding:3px 8px;border-radius:20px;backdrop-filter:blur(4px);z-index:2;letter-spacing:.3px}
 .feed-desc{font-size:13px;color:#666;padding:10px 14px 0;font-style:italic}
 .feed-actions{display:flex;align-items:center;justify-content:space-between;padding:10px 14px 13px;border-top:1px solid #f5f3f0;margin-top:10px}
 .feed-like-btn{display:flex;align-items:center;gap:5px;font-size:14px;font-weight:700}
@@ -419,15 +419,24 @@ input:focus,textarea:focus{outline:none}
         </div>
 
         <div class="pro-card">
-          <div class="pro-title" id="pro-title">Catspot Pro ⭐</div>
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+            <div style="font-size:28px">⭐</div>
+            <div>
+              <div class="pro-title" id="pro-title">Catspot Pro</div>
+              <div style="font-size:11px;color:rgba(255,255,255,.45);margin-top:2px">Pour les vrais amoureux des chats</div>
+            </div>
+          </div>
           <div class="pro-features">
-            <div class="pro-feat">✦ <span id="pro-f1">Stats avancées sur tes spots</span></div>
-            <div class="pro-feat">✦ <span id="pro-f2">Badges exclusifs</span></div>
-            <div class="pro-feat">✦ <span id="pro-f3">Carte en temps réel</span></div>
-            <div class="pro-feat">✦ <span id="pro-f4">Mode sans pub</span></div>
+            <div class="pro-feat">🎨 <span>Cadre de profil doré exclusif</span></div>
+            <div class="pro-feat">⭐ <span>Badge Pro doré sur tous tes posts</span></div>
+            <div class="pro-feat">🌙 <span>Thème sombre pour l'app</span></div>
+            <div class="pro-feat">🗺️ <span>Rayon "Près de moi" étendu à 15km</span></div>
+            <div class="pro-feat">📊 <span>Stats avancées et carte de tes spots</span></div>
+            <div class="pro-feat">🚫 <span>Sans publicité pour toujours</span></div>
           </div>
           <button class="pro-btn" id="pro-btn">Devenir Pro — 2,99 €/mois</button>
-          <div class="pro-annual" id="pro-annual">ou 19,99 €/an (économise 36%)</div>
+          <div class="pro-annual" id="pro-annual">ou 19,99 €/an · économise 44% 🎉</div>
+          <div style="text-align:center;font-size:10px;color:rgba(255,255,255,.25);margin-top:6px">Annulable à tout moment</div>
         </div>
 
         <div class="support-card" onclick="window.open('https://ko-fi.com/benchmark','_blank')">
@@ -525,6 +534,11 @@ const T = {
     ch1:"Trouve un chat roux 🦊", ch2:"Chat sur un rebord de fenêtre 🪟",
     ch3:"Chat qui te regarde dans les yeux 👁️", ch4:"Chat endormi 😴",
     ch5:"Deux chats ensemble 🐱🐱", ch6:"Chat en hauteur 🌳",
+    ch7:"Chat sous la pluie 🌧️", ch8:"Chat avec un chapeau ou déguisé 🎩",
+    ch9:"Chat sur un toit ou balcon 🏙️", ch10:"Chat avec une patte levée 🐾",
+    ch11:"Chat entouré de fleurs 🌺", ch12:"Chat blanc immaculé 👑",
+    ch13:"Chat sur ou sous une voiture 🚗", ch14:"Chat la nuit 🌙",
+    ch15:"Chat dans une boîte ou sac 📦",
     badge1:"Premier Spotter", badge2:"Cartographe Félin",
     badge3:"Chasseur de Roux", badge4:"Légende Locale",
     badge5:"Noctambule", badge6:"Explorateur",
@@ -575,6 +589,11 @@ const T = {
     ch1:"Find a ginger cat 🦊", ch2:"Cat on a windowsill 🪟",
     ch3:"Cat staring right at you 👁️", ch4:"Sleeping cat 😴",
     ch5:"Two cats together 🐱🐱", ch6:"Cat up high 🌳",
+    ch7:"Cat in the rain 🌧️", ch8:"Cat with a hat or costume 🎩",
+    ch9:"Cat on a roof or balcony 🏙️", ch10:"Cat with a raised paw 🐾",
+    ch11:"Cat surrounded by flowers 🌺", ch12:"Perfectly white cat 👑",
+    ch13:"Cat on or under a car 🚗", ch14:"Cat at night 🌙",
+    ch15:"Cat in a box or bag 📦",
     badge1:"First Spotter", badge2:"Feline Cartographer",
     badge3:"Ginger Hunter", badge4:"Local Legend",
     badge5:"Night Owl", badge6:"Explorer",
@@ -605,12 +624,21 @@ const T = {
 };
 
 const CHALLENGES_DEF = [
-  {key:"ch1", pts:50, emoji:"🦊"},
-  {key:"ch2", pts:30, emoji:"🪟"},
-  {key:"ch3", pts:75, emoji:"👁️"},
-  {key:"ch4", pts:20, emoji:"😴"},
-  {key:"ch5", pts:60, emoji:"🐱"},
-  {key:"ch6", pts:40, emoji:"🌳"},
+  {key:"ch1",  pts:50,  emoji:"🦊"},
+  {key:"ch2",  pts:30,  emoji:"🪟"},
+  {key:"ch3",  pts:75,  emoji:"👁️"},
+  {key:"ch4",  pts:20,  emoji:"😴"},
+  {key:"ch5",  pts:60,  emoji:"🐱"},
+  {key:"ch6",  pts:40,  emoji:"🌳"},
+  {key:"ch7",  pts:35,  emoji:"🌧️"},
+  {key:"ch8",  pts:80,  emoji:"🎩"},
+  {key:"ch9",  pts:45,  emoji:"🏙️"},
+  {key:"ch10", pts:55,  emoji:"🐾"},
+  {key:"ch11", pts:25,  emoji:"🌺"},
+  {key:"ch12", pts:90,  emoji:"👑"},
+  {key:"ch13", pts:30,  emoji:"🚗"},
+  {key:"ch14", pts:65,  emoji:"🌙"},
+  {key:"ch15", pts:50,  emoji:"📦"},
 ];
 const BADGES_DEF = [
   {key:"badge1", icon:"🐾", threshold:1},
@@ -643,7 +671,12 @@ const fmtAgo = iso => {
   const mins = Math.round((Date.now()-new Date(iso).getTime())/60000);
   return mins<1?t().justNow:mins<60?t().minsAgo(mins):t().hoursAgo(Math.floor(mins/60));
 };
-const totalPts = () => challenges.reduce((a,c)=>a+(c.done?c.pts:0),0);
+const totalPts = () => {
+  const challengePts = challenges.reduce((a,c)=>a+(c.done?c.pts:0),0);
+  const progress = loadMissionsProgress();
+  const missionPts = getDailyMissions().reduce((a,m)=>a+(progress.done.includes(m.key)?m.pts:0),0);
+  return challengePts + missionPts;
+};
 const levelLabel = n => n>=30?t().levelLegend:n>=10?t().levelHunter:n>=3?t().levelExplorer:t().levelNovice;
 
 function showToast(msg){
@@ -1494,7 +1527,7 @@ function renderFeed(append=false){
         </div>
         <div style="display:flex;gap:4px;align-items:center;flex-shrink:0">${ownerBtns}${adminBtn}</div>
       </div>
-      <div class='feed-photo' style='background:linear-gradient(135deg,${color}18,${color}42)'>${photoHtml}<div class='feed-photo-loc'>📍 Catspot</div></div>
+      <div class='feed-photo' style='background:linear-gradient(135deg,${color}18,${color}42);cursor:pointer' onclick="goToOnMap('${cat.id}')">${photoHtml}<div class='feed-photo-loc'>📍 Catspot</div></div>
       ${cat.desc?`<p class='feed-desc'>"${cat.desc}"</p>`:""}
       <div class='feed-actions'>
         <button class='feed-like-btn' id='fl-${cat.id}' onclick='toggleFeedLike("${cat.id}")' style='color:${isLiked?"#D4572A":"#8A7F72"}'>
@@ -1610,12 +1643,24 @@ async function loadChallengesForUser(){
 
 // ── MISSIONS QUOTIDIENNES ─────────────────────────────────────
 const ALL_MISSIONS = [
-  {key:"m1", emoji:"📸", pts:40, type:"post"},
-  {key:"m2", emoji:"❤️", pts:20, type:"like3"},
-  {key:"m3", emoji:"🐾", pts:30, type:"respot"},
-  {key:"m4", emoji:"📷", pts:50, type:"photo"},
-  {key:"m5", emoji:"🧭", pts:35, type:"newzone"},
-  {key:"m6", emoji:"💬", pts:25, type:"comment"},
+  {key:"m1",  emoji:"📸", pts:40,  type:"post",     titleFr:"Spotteur du jour",     descFr:"Poste un chat aujourd'hui",              titleEn:"Daily Spotter",   descEn:"Post a cat today"},
+  {key:"m2",  emoji:"❤️", pts:20,  type:"like3",    titleFr:"Fan de félins",         descFr:"Like 3 chats aujourd'hui",               titleEn:"Cat Fan",         descEn:"Like 3 cats today"},
+  {key:"m3",  emoji:"🐾", pts:30,  type:"respot",   titleFr:"Témoin",                descFr:"Re-spotte un chat déjà signalé",         titleEn:"Witness",         descEn:"Re-spot an already reported cat"},
+  {key:"m4",  emoji:"📷", pts:50,  type:"photo",    titleFr:"Photographe",           descFr:"Poste un chat avec une photo",           titleEn:"Photographer",    descEn:"Post a cat with a photo"},
+  {key:"m5",  emoji:"💬", pts:25,  type:"comment",  titleFr:"Social",                descFr:"Laisse un commentaire",                  titleEn:"Social",          descEn:"Leave a comment"},
+  {key:"m6",  emoji:"🌅", pts:35,  type:"morning",  titleFr:"Lève-tôt",              descFr:"Poste avant 10h du matin",               titleEn:"Early Bird",      descEn:"Post before 10am"},
+  {key:"m7",  emoji:"🌙", pts:35,  type:"evening",  titleFr:"Noctambule",            descFr:"Poste après 20h",                        titleEn:"Night Owl",       descEn:"Post after 8pm"},
+  {key:"m8",  emoji:"🔥", pts:60,  type:"like5",    titleFr:"Généreux",              descFr:"Like 5 chats aujourd'hui",               titleEn:"Generous",        descEn:"Like 5 cats today"},
+  {key:"m9",  emoji:"🗺️", pts:45,  type:"newzone",  titleFr:"Explorateur",           descFr:"Poste dans une nouvelle zone",           titleEn:"Explorer",        descEn:"Post in a new area"},
+  {key:"m10", emoji:"⭐", pts:70,  type:"rare",     titleFr:"Chasseur de raretés",   descFr:"Trouve un chat en zone isolée",          titleEn:"Rarity Hunter",   descEn:"Find a cat in an isolated area"},
+  {key:"m11", emoji:"🔁", pts:20,  type:"respot",   titleFr:"Fidèle",                descFr:"Re-spotte 2 chats différents",           titleEn:"Faithful",        descEn:"Re-spot 2 different cats"},
+  {key:"m12", emoji:"🏘️", pts:30,  type:"nearby",   titleFr:"Quartier vivant",       descFr:"Ouvre le feed local",                    titleEn:"Lively Hood",     descEn:"Open the local feed"},
+  {key:"m13", emoji:"🎯", pts:55,  type:"share",    titleFr:"Ambassadeur",           descFr:"Partage un chat",                        titleEn:"Ambassador",      descEn:"Share a cat"},
+  {key:"m14", emoji:"🐱", pts:40,  type:"post",     titleFr:"Deux en un",            descFr:"Poste 2 chats dans la journée",          titleEn:"Double Trouble",  descEn:"Post 2 cats in a day"},
+  {key:"m15", emoji:"💡", pts:25,  type:"comment",  titleFr:"Storyteller",           descFr:"Commente avec plus de 20 caractères",    titleEn:"Storyteller",     descEn:"Comment with more than 20 characters"},
+  {key:"m16", emoji:"🌍", pts:30,  type:"like3",    titleFr:"Global",                descFr:"Like des chats en mode Global",          titleEn:"Global",          descEn:"Like cats in Global mode"},
+  {key:"m17", emoji:"🤝", pts:45,  type:"respot",   titleFr:"Communauté",            descFr:"Re-spotte un chat de quelqu'un d'autre", titleEn:"Community",       descEn:"Re-spot someone else's cat"},
+  {key:"m18", emoji:"🏆", pts:80,  type:"all3",     titleFr:"Triplé gagnant",        descFr:"Complète les 3 autres missions du jour", titleEn:"Hat Trick",       descEn:"Complete the 3 other daily missions"},
 ];
 
 function getTodayKey(){
@@ -1655,8 +1700,9 @@ function completeMission(type){
   if(progress.done.includes(mission.key)) return;
   progress.done.push(mission.key);
   saveMissionsProgress(progress);
-  showToast(`🎯 Mission accomplie ! +${mission.pts} pts`);
+  showToast(`🎯 +${mission.pts} pts — ${lang==="fr"?mission.titleFr:mission.titleEn} !`);
   renderMissions();
+  if($("pts-total")) $("pts-total").textContent = totalPts();
 }
 
 function renderMissions(){
@@ -1671,11 +1717,13 @@ function renderMissions(){
   if($("missions-reset")) $("missions-reset").textContent = t().missionsReset(hoursLeft);
   wrap.innerHTML = missions.map(m=>{
     const done = progress.done.includes(m.key);
+    const title = lang==="fr" ? m.titleFr : m.titleEn;
+    const desc  = lang==="fr" ? m.descFr  : m.descEn;
     return `<div class="mission-card${done?" done":""}" onclick="toggleMission('${m.key}')">
       <span class="mission-icon">${m.emoji}</span>
       <div style="flex:1">
-        <div class="mission-title">${t()[m.key+"title"]||m.key}</div>
-        <div class="mission-desc">${t()[m.key+"desc"]||""}</div>
+        <div class="mission-title">${title}</div>
+        <div class="mission-desc">${desc}</div>
         <div class="mission-pts">+${m.pts} pts</div>
       </div>
       <div class="mission-check${done?" done":""}">${done?"✓":"○"}</div>
@@ -1691,10 +1739,12 @@ function toggleMission(key){
   } else {
     progress.done.push(key);
     const m = ALL_MISSIONS.find(x=>x.key===key);
-    if(m) showToast(`🎯 Mission validée ! +${m.pts} pts`);
+    if(m) showToast(`🎯 +${m.pts} pts — Mission validée !`);
   }
   saveMissionsProgress(progress);
   renderMissions();
+  // Mettre à jour le total de points
+  if($("pts-total")) $("pts-total").textContent = totalPts();
 }
 window.toggleMission = toggleMission;
 
@@ -1735,6 +1785,19 @@ function fallbackShare(text){
   }
 }
 window.shareCat = shareCat;
+
+function goToOnMap(catId){
+  const cat = cats.find(c=>c.id===catId);
+  if(!cat) return;
+  switchTab("map");
+  setTimeout(()=>{
+    if(mapInstance){
+      mapInstance.flyTo({center:[cat.lng, cat.lat], zoom:17, duration:800});
+      setTimeout(()=>openPopup({...cat, color:getCatPinColor(cat)}), 900);
+    }
+  }, 150);
+}
+window.goToOnMap = goToOnMap;
 
 function renderChallenges(){
   $("pts-total").textContent=totalPts();
