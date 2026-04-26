@@ -942,42 +942,50 @@ async function toggleLikeDB(catId, wasLiked){
 }
 
 async function uploadPhoto(file, catId){
-  if(!file) { console.log("uploadPhoto: pas de fichier"); return null; }
-  console.log("uploadPhoto: début", file.name, file.size, "catId:", catId);
+  if(!file) return null;
   try {
     const compressed = await compressImage(file);
-    console.log("uploadPhoto: compressé", compressed.size, "bytes");
     const path = catId+"/"+Date.now()+".jpg";
-    console.log("uploadPhoto: upload vers", path);
-    const {data, error} = await sb.storage.from("cat-photos").upload(path, compressed, {contentType:"image/jpeg"});
-    if(error){ console.error("uploadPhoto: erreur upload", error); throw error; }
-    console.log("uploadPhoto: succès", data);
-    const {data:urlData} = sb.storage.from("cat-photos").getPublicUrl(path);
-    console.log("uploadPhoto: URL publique", urlData.publicUrl);
-    return urlData.publicUrl;
-  } catch(e){ console.error("uploadPhoto: exception", e); return null; }
+    const response = await fetch("/api/upload", {
+      method: "POST",
+      headers: {
+        "x-file-path": path,
+        "x-content-type": "image/jpeg"
+      },
+      body: compressed
+    });
+    if(!response.ok){ console.warn("uploadPhoto erreur:", response.status); return null; }
+    const data = await response.json();
+    return data?.publicUrl || null;
+  } catch(e){ console.warn("uploadPhoto exception:", e); return null; }
 }
 
-// Compression canvas — max 1200px, qualité 0.82
-// Réduit une photo iPhone de 8Mo à ~200-400Ko
-function compressImage(file, maxPx=1200, quality=0.82){
+function compressImage(file, maxPx=800, quality=0.75){
   return new Promise(resolve => {
-    const img = new Image();
-    const url = URL.createObjectURL(file);
-    img.onload = () => {
-      URL.revokeObjectURL(url);
-      let {width:w, height:h} = img;
-      if(w>maxPx||h>maxPx){
-        if(w>h){h=Math.round(h*maxPx/w);w=maxPx;}
-        else{w=Math.round(w*maxPx/h);h=maxPx;}
-      }
-      const canvas=document.createElement("canvas");
-      canvas.width=w; canvas.height=h;
-      canvas.getContext("2d").drawImage(img,0,0,w,h);
-      canvas.toBlob(blob=>resolve(blob||file),"image/jpeg",quality);
-    };
-    img.onerror=()=>resolve(file);
-    img.src=url;
+    // Fallback immédiat si pas de support canvas
+    if(typeof document === "undefined"){ resolve(file); return; }
+    try {
+      const img = new Image();
+      const url = URL.createObjectURL(file);
+      img.onload = () => {
+        try {
+          URL.revokeObjectURL(url);
+          let {width:w, height:h} = img;
+          if(w>maxPx||h>maxPx){
+            if(w>h){h=Math.round(h*maxPx/w);w=maxPx;}
+            else{w=Math.round(w*maxPx/h);h=maxPx;}
+          }
+          const canvas=document.createElement("canvas");
+          canvas.width=w; canvas.height=h;
+          const ctx=canvas.getContext("2d");
+          if(!ctx){ resolve(file); return; }
+          ctx.drawImage(img,0,0,w,h);
+          canvas.toBlob(blob=>resolve(blob||file),"image/jpeg",quality);
+        } catch(e){ resolve(file); }
+      };
+      img.onerror=()=>{ URL.revokeObjectURL(url); resolve(file); };
+      img.src=url;
+    } catch(e){ resolve(file); }
   });
 }
 
@@ -2059,22 +2067,11 @@ async function _doPublish(){
 
   const cat = {...saved, likes:0, desc:saved.description||""};
 
-  // Upload photo si présente
-  if(file && saved.id){
-    console.log("Upload photo pour cat", saved.id);
-    const url = await uploadPhoto(file, saved.id);
-    if(url){
-      cat.photo_url = url;
-      await sb.from("cats").update({photo_url: url}).eq("id", saved.id).catch(e=>console.warn("update photo_url:", e));
-    }
-  }
-
-  // Succès
+  // Succès immédiat — afficher le chat sans attendre la photo
   cats.unshift(cat);
   selectedPhotoFile = null;
   userProfile.totalCats = (userProfile.totalCats||0) + 1;
   completeMission("post");
-  if(file) completeMission("photo");
   if(manualPinMarker){ manualPinMarker.remove(); manualPinMarker=null; }
   closeModal();
   showToast(t().published);
@@ -2087,6 +2084,19 @@ async function _doPublish(){
   }
   if(currentTab==="feed") renderFeed();
   if(currentTab==="profile") renderProfile();
+
+  // Upload photo EN ARRIÈRE-PLAN — ne bloque pas la publication
+  if(file && saved.id){
+    uploadPhoto(file, saved.id).then(url=>{
+      if(url){
+        cat.photo_url = url;
+        sb.from("cats").update({photo_url: url}).eq("id", saved.id).catch(()=>{});
+        // Rafraîchir le feed si visible
+        if(currentTab==="feed") renderFeed();
+      }
+    }).catch(()=>{});
+    completeMission("photo");
+  }
 } // fin _doPublish
 function updateNavVisibility(){
   // Onglet Défis visible uniquement si connecté
