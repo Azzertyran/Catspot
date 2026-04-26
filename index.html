@@ -845,6 +845,7 @@ async function initAuth(){
       currentUser = data.session.user;
       await Promise.all([loadUserLikes(), loadUserProfile()]);
       await loadChallengesForUser();
+      trackActivity("open"); // Maintenir le streak à chaque ouverture
     } else {
       currentUser = null;
     }
@@ -863,8 +864,9 @@ async function initAuth(){
     if(event === "SIGNED_IN" && currentUser && !currentUser.is_anonymous){
       likes = {};
       await Promise.all([loadUserLikes(), loadUserProfile()]);
-      await loadChallengesForUser(); // Récupérer les défis depuis Supabase
+      await loadChallengesForUser();
       await loadCats();
+      trackActivity("open");
       if(mapInstance && mapInstance.isStyleLoaded()){ renderMapCats(); updateCatOfDay(); }
       updateAuthUI();
       if(currentTab==="feed") renderFeed();
@@ -979,28 +981,59 @@ async function loadCommentCounts(){
   } catch(e){ }
 }
 
+async function trackActivity(action){
+  if(!currentUser || currentUser.is_anonymous) return;
+  const day = new Date().toISOString().split("T")[0];
+  const user_id = currentUser.user_metadata?.full_name || currentUser.email?.split("@")[0] || currentUser.id;
+  try {
+    await fetch("/api/activity", {
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({user_id, action, day})
+    });
+  } catch(e){}
+}
+
 async function loadUserProfile(){
   if(!currentUser||currentUser.is_anonymous) return;
   try {
     const name = currentUser.user_metadata?.full_name || currentUser.email?.split("@")[0] || "";
     // Chats postés
     const {count:catsCount} = await sb.from("cats").select("*",{count:"exact",head:true}).eq("posted_by",name);
-    // Likes reçus sur ses chats
+    // Likes reçus
     const {data:myCats} = await sb.from("cats").select("id,likes_count").eq("posted_by",name);
     const totalLikes = (myCats||[]).reduce((a,c)=>a+(c.likes_count||0),0);
-    // Streak — jours consécutifs avec un chat posté
-    const {data:mySpots} = await sb.from("cats").select("created_at").eq("posted_by",name).order("created_at",{ascending:false});
+
+    // ── Nouveau streak basé sur l'activité ────────────────────
+    const user_id = name;
+    const {data:activityData} = await sb.from("user_activity")
+      .select("day")
+      .eq("user_id", user_id)
+      .order("day", {ascending:false})
+      .limit(60);
+
     let streak = 0;
-    if(mySpots?.length){
-      const today = new Date(); today.setHours(0,0,0,0);
-      let checkDay = new Date(today);
-      for(let i=0;i<30;i++){
-        const dayStr = checkDay.toISOString().split("T")[0];
-        const hasSpot = mySpots.some(s=>s.created_at.startsWith(dayStr));
-        if(hasSpot){ streak++; checkDay.setDate(checkDay.getDate()-1); }
-        else break;
+    if(activityData?.length){
+      // Collecter les jours uniques d'activité
+      const activeDays = [...new Set(activityData.map(a=>a.day))].sort().reverse();
+      const today = new Date().toISOString().split("T")[0];
+      const yesterday = new Date(Date.now()-86400000).toISOString().split("T")[0];
+
+      // Grace period — si actif hier mais pas encore aujourd'hui, on compte quand même
+      const startDay = activeDays[0] === today || activeDays[0] === yesterday ? activeDays[0] : null;
+
+      if(startDay){
+        let checkDate = new Date(startDay);
+        for(const day of activeDays){
+          const checkStr = checkDate.toISOString().split("T")[0];
+          if(day === checkStr){
+            streak++;
+            checkDate.setDate(checkDate.getDate()-1);
+          } else if(day < checkStr) break; // Gap — streak cassé
+        }
       }
     }
+
     userProfile = {totalCats:catsCount||0, totalLikes, streak};
     renderProfile();
   } catch(e){ }
@@ -1528,6 +1561,7 @@ async function reSpot(catId){
     $("popup-meta").textContent="Par "+poster+" · "+t().sightings(cat.sightings)+" · "+fmtAgo(cat.created_at||new Date().toISOString());
     showToast("🐾 "+(lang==="fr"?"Signalement ajouté !":"Sighting added!"));
     completeMission("respot");
+    trackActivity("respot");
     if(currentTab==="feed") renderFeed();
   } catch(e){ showToast("❌ Erreur"); }
 }
@@ -1621,6 +1655,7 @@ async function postComment(catId){
     }
     commentCounts[catId] = (commentCounts[catId]||0)+1;
     completeMission("comment");
+    trackActivity("comment");
     const feedBtn = document.querySelector(`button[onclick="showComments('${catId}')"]`);
     if(feedBtn){
       const n = commentCounts[catId];
@@ -1994,6 +2029,7 @@ function toggleFeedLike(id){
   if(selectedCat?.id===id) updatePopupLike({...selectedCat, likes_count: displayCount});
   saveLikesToStorage();
   updateCatOfDay();
+  if(likes[id]) trackActivity("like");
   const todayLikes = Object.keys(likes).filter(k=>likes[k]).length;
   if(likes[id] && todayLikes >= 3) completeMission("like3");
   if(likes[id] && todayLikes >= 5) completeMission("m8");
@@ -2274,8 +2310,16 @@ function renderProfile(){
   $("stat-likes").textContent=userProfile.totalLikes;
   $("stat-likes-lbl").textContent=t().statLikes;
   $("stat-cats-lbl").textContent="Chats";
-  $("streak-days").textContent=t().streakDays(userProfile.streak);
-  $("streak-lbl").textContent=t().streakLbl;
+  const s = userProfile.streak;
+  $("streak-days").textContent = t().streakDays(s);
+  // Message motivant selon le niveau de streak
+  const streakMsg = s === 0 ? (lang==="fr"?"Ouvre l'app chaque jour !":"Open the app every day!") :
+    s < 3  ? (lang==="fr"?"Continue comme ça ! 🔥":"Keep it up! 🔥") :
+    s < 7  ? (lang==="fr"?"Tu es en feu ! 🔥🔥":"You're on fire! 🔥🔥") :
+    s < 14 ? (lang==="fr"?"Impressionnant ! 🔥🔥🔥":"Impressive! 🔥🔥🔥") :
+    s < 30 ? (lang==="fr"?"Légende vivante ! 🏆":"Living legend! 🏆") :
+    (lang==="fr"?"CATSPOT ADDICT 👑":"CATSPOT ADDICT 👑");
+  $("streak-lbl").textContent = streakMsg;
   $("profile-level").textContent=levelLabel(userProfile.totalCats);
   // Pro card — éléments optionnels (HTML statique maintenant)
   const proTitle=$("pro-title"); if(proTitle) proTitle.textContent=t().proTitle;
@@ -2452,6 +2496,7 @@ async function _doPublish(){
   if(manualPinMarker){ manualPinMarker.remove(); manualPinMarker=null; }
   closeModal();
   showToast(t().published);
+  trackActivity("post");
 
   if(mapInstance && mapInstance.isStyleLoaded()){
     addCatMarker(cat);
