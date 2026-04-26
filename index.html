@@ -1679,23 +1679,28 @@ async function publishSos(){
       const res = await fetch("/api/upload", {method:"POST", headers:{"x-file-path":path,"x-content-type":"image/jpeg"}, body:compressed});
       if(res.ok){ const d = await res.json(); photo_url = d.publicUrl; }
     }
-    const {data, error} = await sb.from("lost_cats").insert([{
-      type: sosType,
-      name: name||"Inconnu",
-      description: desc||"",
-      contact,
-      posted_by,
-      lat: parseFloat(userLat)||47.4784,
-      lng: parseFloat(userLng)||-0.5632,
-      photo_url,
-      resolved: false
-    }]).select().single();
-    if(error){ showToast("❌ "+error.message); return; }
+    const response = await fetch("/api/publish-sos", {
+      method: "POST",
+      headers: {"Content-Type":"application/json"},
+      body: JSON.stringify({
+        type: sosType,
+        name: name||"Inconnu",
+        description: desc||"",
+        contact,
+        posted_by,
+        lat: parseFloat(userLat)||47.4784,
+        lng: parseFloat(userLng)||-0.5632,
+        photo_url,
+        resolved: false
+      })
+    });
+    if(!response.ok){ const e = await response.json(); showToast("❌ "+(e?.error||"Erreur")); return; }
+    const data = await response.json();
     sosAnnonces.unshift(data);
     closeSosModal();
     renderSos();
     showToast("✅ Annonce publiée !");
-  } catch(e){ showToast("❌ Erreur: "+e.message); }
+  } catch(e){ showToast("❌ "+e.message); }
 }
 window.publishSos = publishSos;
 
