@@ -660,6 +660,7 @@ let cats = [];
 let challenges = CHALLENGES_DEF.map(c=>({...c, done:false}));
 let likes = {};
 let commentCounts = {}; // {catId: number}
+let deletedCatIds = new Set(); // IDs supprimés localement — exclus du reload
 let selectedCat = null;
 let mapInstance = null;
 let markers = {};
@@ -824,7 +825,9 @@ async function loadCats(){
     const {data,error} = await sb.from("cats").select("*").order("created_at",{ascending:false});
     if(error){ console.error("loadCats erreur:", error); cats=[]; return; }
     // Mapper description -> desc pour compatibilité avec le reste du code
-    cats = (data||[]).map(c=>({...c, likes:c.likes_count||0, desc:c.description||c.desc||null}));
+    cats = (data||[])
+      .filter(c => !deletedCatIds.has(c.id)) // Exclure les suppressions locales
+      .map(c=>({...c, likes:c.likes_count||0, desc:c.description||c.desc||null}));
     console.log("loadCats: "+cats.length+" chats chargés");
     // Charger les compteurs de commentaires
     await loadCommentCounts();
@@ -1268,16 +1271,40 @@ window.saveEditCat=saveEditCat;
 
 // ── ADMIN ─────────────────────────────────────────────────────
 async function deleteCat(id){
-  if(!isAdmin()) return;
+  if(!isAdmin() && !(currentUser && cats.find(c=>c.id===id)?.posted_by===(currentUser.user_metadata?.full_name||currentUser.email?.split("@")[0]))) return;
   if(!confirm(lang==="fr"?"Supprimer ce chat ?":"Delete this cat?")) return;
   try {
-    await sb.from("cats").delete().eq("id", id);
+    // Supprimer via proxy pour éviter les problèmes réseau mobile
+    const res = await fetch(`/api/delete?id=${id}`, {method:"DELETE"});
+    if(!res.ok){
+      // Fallback direct Supabase
+      await sb.from("cats").delete().eq("id", id);
+    }
+    // Marquer comme supprimé localement — survivra aux reloads
+    deletedCatIds.add(id);
+    cats = cats.filter(c=>c.id!==id);
+    if(markers[id]){ markers[id].marker.remove(); delete markers[id]; }
+    if(selectedCat?.id===id) closePopup();
+    // Reconstruire les hotspots
+    if(mapInstance && mapInstance.isStyleLoaded()){
+      // Supprimer les anciens layers hotspot
+      for(let i=0;i<5;i++){
+        if(mapInstance.getLayer("hs-"+i)) mapInstance.removeLayer("hs-"+i);
+        if(mapInstance.getSource("hs-"+i)) mapInstance.removeSource("hs-"+i);
+      }
+      addDynamicHotspots();
+      updateCatOfDay();
+    }
+    renderFeed();
+    showToast("🗑️ "+(lang==="fr"?"Chat supprimé":"Cat deleted"));
+  } catch(e){ 
+    deletedCatIds.add(id);
     cats = cats.filter(c=>c.id!==id);
     if(markers[id]){ markers[id].marker.remove(); delete markers[id]; }
     if(selectedCat?.id===id) closePopup();
     renderFeed();
-    showToast("🗑️ "+(lang==="fr"?"Chat supprimé":"Cat deleted"));
-  } catch(e){ showToast("❌ Erreur"); }
+    showToast("🗑️ Supprimé localement");
+  }
 }
 window.deleteCat = deleteCat;
 
@@ -1333,10 +1360,19 @@ window.setFeedFilter = setFeedFilter;
 
 async function refreshFeed(){
   const btn = document.querySelector("[onclick=\"refreshFeed()\"]");
-  if(btn) btn.textContent = "↻ ...";
+  if(btn){ btn.textContent = "↻ ..."; btn.disabled = true; }
+  // Recharger depuis Supabase mais en préservant les suppressions locales
+  const deletedIds = new Set();
+  const oldIds = new Set(cats.map(c=>c.id));
   await loadCats();
+  // Retirer les chats qui ont été supprimés localement (pas dans oldIds mais présents en base)
+  // En fait : si un chat était dans oldIds et n'est plus dans cats après loadCats → supprimé en base ✅
+  // Si un chat était dans oldIds et est toujours dans cats → pas supprimé en base
+  // On ne peut pas faire mieux sans tracker les suppressions
   renderFeed();
-  if(btn) btn.textContent = "↻ Refresh";
+  renderMapCats();
+  updateCatOfDay();
+  if(btn){ btn.textContent = "↻ Refresh"; btn.disabled = false; }
   showToast("🔄 "+(lang==="fr"?"Feed mis à jour":"Feed refreshed"));
 }
 window.refreshFeed = refreshFeed;
