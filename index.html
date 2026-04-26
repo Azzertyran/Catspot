@@ -1080,23 +1080,20 @@ async function saveCat(catData){
 let likeInProgress = new Set();
 
 async function toggleLikeDB(catId, wasLiked){
-  if(likeInProgress.has(catId)) return;
-  likeInProgress.add(catId);
+  if(!isRealUser()){
+    const pending = JSON.parse(localStorage.getItem("catspot_pending_likes")||"[]");
+    if(!wasLiked && !pending.includes(catId)) pending.push(catId);
+    else { const i=pending.indexOf(catId); if(i>-1) pending.splice(i,1); }
+    localStorage.setItem("catspot_pending_likes", JSON.stringify(pending));
+    return;
+  }
   try {
-    if(!isRealUser()){
-      const pending = JSON.parse(localStorage.getItem("catspot_pending_likes")||"[]");
-      if(!wasLiked && !pending.includes(catId)) pending.push(catId);
-      else { const i=pending.indexOf(catId); if(i>-1) pending.splice(i,1); }
-      localStorage.setItem("catspot_pending_likes", JSON.stringify(pending));
-      return;
-    }
     await fetch("/api/like", {
-      method: "POST",
-      headers: {"Content-Type":"application/json"},
-      body: JSON.stringify({cat_id:catId, user_id:currentUser.id, was_liked:wasLiked})
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({cat_id:catId, user_id:currentUser.id, was_liked:wasLiked})
     });
   } catch(e){}
-  finally { likeInProgress.delete(catId); }
 }
 
 async function uploadPhoto(file, catId){
@@ -2017,32 +2014,22 @@ function displayLikes(cat){
 }
 
 function toggleFeedLike(id){
-  if(likeInProgress.has(id)) return;
   const wasLiked = !!likes[id];
   likes[id] = !wasLiked;
   const cat = cats.find(c=>c.id===id);
   if(!cat) return;
-  // Affichage optimiste — juste le cœur change couleur, pas le chiffre
+  // Ajuster le compteur local pour l'affichage
+  cat.likes_count = Math.max(0, (cat.likes_count||0) + (likes[id]?1:-1));
+  // Mettre à jour l'UI
   const btn = $("fl-"+id);
-  if(btn){ btn.innerHTML = (likes[id]?"❤️":"🤍")+" "+t().likes(cat.likes_count||0); btn.style.color = likes[id]?"#D4572A":"#8A7F72"; }
-  if(selectedCat?.id===id) updatePopupLike({...selectedCat});
+  if(btn){ btn.innerHTML=(likes[id]?"❤️":"🤍")+" "+t().likes(cat.likes_count); btn.style.color=likes[id]?"#D4572A":"#8A7F72"; }
+  if(selectedCat?.id===id){ selectedCat.likes_count=cat.likes_count; updatePopupLike(selectedCat); }
   saveLikesToStorage();
+  updateCatOfDay();
   if(likes[id]) trackActivity("like");
   const todayLikes = Object.keys(likes).filter(k=>likes[k]).length;
-  if(likes[id] && todayLikes >= 3) completeMission("like3");
-  if(likes[id] && todayLikes >= 5) completeMission("m8");
-  // Envoyer à Supabase puis recharger le vrai count
-  toggleLikeDB(id, wasLiked).then(()=>{
-    sb.from("cats").select("likes_count").eq("id",id).single().then(({data})=>{
-      if(data){
-        cat.likes_count = data.likes_count;
-        const b = $("fl-"+id);
-        if(b) b.innerHTML = (likes[id]?"❤️":"🤍")+" "+t().likes(data.likes_count);
-        if(selectedCat?.id===id) updatePopupLike({...selectedCat, likes_count:data.likes_count});
-        updateCatOfDay();
-      }
-    }).catch(()=>{});
-  });
+  if(likes[id] && todayLikes>=3) completeMission("like3");
+  toggleLikeDB(id, wasLiked);
 }
 
 function isRealUser(){
@@ -2750,27 +2737,16 @@ $("modal-overlay").addEventListener("click",e=>{if(e.target===$("modal-overlay")
 $("popup-like-btn").addEventListener("click",async ()=>{
   if(!selectedCat) return;
   const id = selectedCat.id;
-  if(likeInProgress.has(id)) return;
   const wasLiked = !!likes[id];
   likes[id] = !wasLiked;
   const cat = cats.find(c=>c.id===id);
-  // Affichage optimiste — juste le cœur
+  if(cat){ cat.likes_count = Math.max(0,(cat.likes_count||0)+(likes[id]?1:-1)); selectedCat.likes_count=cat.likes_count; }
   updatePopupLike(selectedCat);
-  const btn = $("fl-"+id);
-  if(btn) btn.style.color = likes[id]?"#D4572A":"#8A7F72";
+  const btn=$("fl-"+id);
+  if(btn&&cat){ btn.innerHTML=(likes[id]?"❤️":"🤍")+" "+t().likes(cat.likes_count); btn.style.color=likes[id]?"#D4572A":"#8A7F72"; }
   saveLikesToStorage();
+  updateCatOfDay();
   await toggleLikeDB(id, wasLiked);
-  // Recharger le vrai count
-  sb.from("cats").select("likes_count").eq("id",id).single().then(({data})=>{
-    if(data){
-      if(cat) cat.likes_count = data.likes_count;
-      selectedCat.likes_count = data.likes_count;
-      updatePopupLike(selectedCat);
-      const b = $("fl-"+id);
-      if(b) b.innerHTML = (likes[id]?"❤️":"🤍")+" "+t().likes(data.likes_count);
-      updateCatOfDay();
-    }
-  }).catch(()=>{});
 });
 $("popup-respott-btn").addEventListener("click",(e)=>{ e.stopPropagation(); if(selectedCat) reSpot(selectedCat.id); });
 $("popup-comment-btn").addEventListener("click",(e)=>{ e.stopPropagation(); if(selectedCat) showComments(selectedCat.id); });
