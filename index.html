@@ -888,19 +888,20 @@ async function loadUserLikes(){
 
 async function saveCat(catData){
   try {
-    showToast("📡 Connexion Supabase...");
-    const result = await sb.from("cats").insert([catData]).select().single();
-    if(result.error){
-      showToast("❌ "+result.error.message);
+    showToast("📡 Publication...");
+    const response = await fetch("/api/publish", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify(catData)
+    });
+    const data = await response.json();
+    if(!response.ok){
+      showToast("❌ " + (data?.error?.message || data?.message || "Erreur serveur"));
       return null;
     }
-    if(!result.data){
-      showToast("❌ Pas de réponse");
-      return null;
-    }
-    return result.data;
+    return data;
   } catch(e){
-    showToast("❌ Exception: "+(e?.message||String(e)));
+    showToast("❌ " + (e?.message || "Erreur réseau"));
     return null;
   }
 }
