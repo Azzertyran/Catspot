@@ -660,7 +660,7 @@ let cats = [];
 let challenges = CHALLENGES_DEF.map(c=>({...c, done:false}));
 let likes = {};
 let commentCounts = {}; // {catId: number}
-let deletedCatIds = new Set(); // IDs supprimés localement — exclus du reload
+let deletedCatIds = new Set(JSON.parse(localStorage.getItem("catspot_deleted")||"[]"));
 let selectedCat = null;
 let mapInstance = null;
 let markers = {};
@@ -1280,8 +1280,8 @@ async function deleteCat(id){
       // Fallback direct Supabase
       await sb.from("cats").delete().eq("id", id);
     }
-    // Marquer comme supprimé localement — survivra aux reloads
     deletedCatIds.add(id);
+    try { localStorage.setItem("catspot_deleted", JSON.stringify([...deletedCatIds])); } catch(e){}
     cats = cats.filter(c=>c.id!==id);
     if(markers[id]){ markers[id].marker.remove(); delete markers[id]; }
     if(selectedCat?.id===id) closePopup();
@@ -1299,6 +1299,7 @@ async function deleteCat(id){
     showToast("🗑️ "+(lang==="fr"?"Chat supprimé":"Cat deleted"));
   } catch(e){ 
     deletedCatIds.add(id);
+    try { localStorage.setItem("catspot_deleted", JSON.stringify([...deletedCatIds])); } catch(e2){}
     cats = cats.filter(c=>c.id!==id);
     if(markers[id]){ markers[id].marker.remove(); delete markers[id]; }
     if(selectedCat?.id===id) closePopup();
