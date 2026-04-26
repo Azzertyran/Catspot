@@ -697,10 +697,14 @@ async function initAuth(){
     history.replaceState(null,"",window.location.pathname);
   }
 
-  // Récupérer session — une seule tentative, pas de retry bloquant
   try {
-    const {data} = await sb.auth.getSession();
-    if(data?.session?.user){
+    const {data, error} = await sb.auth.getSession();
+    if(error){
+      // Token invalide/expiré — nettoyer et repartir propre
+      console.warn("Session invalide, nettoyage:", error.message);
+      await sb.auth.signOut().catch(()=>{});
+      currentUser = null;
+    } else if(data?.session?.user){
       currentUser = data.session.user;
       console.log("initAuth: connecté", currentUser.user_metadata?.full_name||currentUser.email);
       await Promise.all([loadUserLikes(), loadUserProfile()]);
@@ -708,8 +712,15 @@ async function initAuth(){
     } else {
       console.log("initAuth: non connecté");
     }
-  } catch(e){ console.warn("initAuth error:", e); }
-  
+  } catch(e){
+    console.warn("initAuth error:", e);
+    // Si refresh token invalide → nettoyer le storage Supabase
+    if(e.message?.includes("Refresh Token") || e.message?.includes("refresh_token")){
+      Object.keys(localStorage).filter(k=>k.startsWith("sb-")).forEach(k=>localStorage.removeItem(k));
+    }
+    currentUser = null;
+  }
+
   updateAuthUI();
 
   // Écouter les changements d'auth
@@ -867,7 +878,7 @@ async function loadUserLikes(){
     if(pending.length){
       for(const catId of pending){
         if(!likes[catId]){
-          try { await sb.from("likes").insert([{user_id:currentUser.id, cat_id:catId, sighting_id:null}]); likes[catId]=true; } catch(e){}
+          try { await sb.from("likes").insert([{user_id:currentUser.id, cat_id:catId}]); likes[catId]=true; } catch(e){}
         }
       }
       localStorage.removeItem("catspot_pending_likes");
@@ -912,7 +923,7 @@ async function toggleLikeDB(catId, wasLiked){
         await sb.from("cats").update({likes_count: newCount}).eq("id", catId);
       });
     } else {
-      await sb.from("likes").insert([{user_id:currentUser.id, cat_id:catId, sighting_id:null}]);
+      await sb.from("likes").insert([{user_id:currentUser.id, cat_id:catId}]);
       await sb.rpc("increment_likes", {cat_id: catId}).catch(async ()=>{
         const cat = cats.find(c=>c.id===catId);
         const newCount = (cat?.likes_count||0)+1;
@@ -1986,7 +1997,21 @@ function handlePhotoInput(file){
 $("photo-camera").addEventListener("change",function(){ handlePhotoInput(this.files[0]); });
 $("photo-gallery").addEventListener("change",function(){ handlePhotoInput(this.files[0]); });
 
+let isPublishing = false;
 async function publishSpot(){
+  if(isPublishing) return;
+  isPublishing = true;
+  const btn = $("modal-publish");
+  if(btn){ btn.disabled=true; btn.textContent="⏳ Publication..."; }
+  try {
+    await _doPublish();
+  } finally {
+    isPublishing = false;
+    if(btn){ btn.disabled=false; btn.textContent=t().publish; }
+  }
+}
+
+async function _doPublish(){
   const name=$("input-name").value.trim()||"Chat inconnu";
   const desc=$("input-desc").value.trim()||"";
 
@@ -2054,9 +2079,7 @@ async function publishSpot(){
   }
   if(currentTab==="feed") renderFeed();
   if(currentTab==="profile") renderProfile();
-}
-
-// ── NAV ───────────────────────────────────────────────────────
+} // fin _doPublish
 function updateNavVisibility(){
   // Onglet Défis visible uniquement si connecté
   const chBtn = document.querySelector("[data-tab='challenges']");
