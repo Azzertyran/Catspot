@@ -555,7 +555,7 @@ const T = {
     m5title:"Explorateur", m5desc:"Poste un chat dans une nouvelle zone",
     m6title:"Social", m6desc:"Laisse un commentaire",
     rareLabel:"✨ Rare",
-    todayLabel:"⚡ Aujourd'hui",
+    todayLabel:"⚡ Auj.",
     authTitle:"Rejoins la communauté 🐾",
     authSub:"Connecte-toi pour sauvegarder ton profil, tes likes et tes badges.",
     googleBtn:"Continuer avec Google",
@@ -766,8 +766,14 @@ async function signInWithGoogle(){
 }
 
 async function signOut(){
-  await sb.auth.signOut();
-  // Recharger proprement — évite les bugs de session résiduelle
+  try {
+    await sb.auth.signOut();
+  } catch(e){
+    console.warn("signOut erreur:", e);
+    // Retry une fois
+    try { await sb.auth.signOut(); } catch(e2){}
+  }
+  // Recharger proprement dans tous les cas
   window.location.href = window.location.pathname;
 }
 
@@ -1102,7 +1108,7 @@ function addDynamicHotspots(){
     try {
       mapInstance.addSource("hs-"+i,{type:"geojson",data:{type:"Feature",geometry:{type:"Point",coordinates:[cl.lng,cl.lat]}}});
       mapInstance.addLayer({id:"hs-"+i,type:"circle",source:"hs-"+i,paint:{
-        "circle-radius":["interpolate",["linear"],["zoom"],11,n*25,14,n*70,17,n*130],
+        "circle-radius":["interpolate",["linear"],["zoom"],12,n*8,15,n*20,17,n*40],
         "circle-color":col,
         "circle-blur":0.7,
         "circle-opacity":1,
@@ -2136,17 +2142,29 @@ function applyLang(){
 
 $("lang-btn").addEventListener("click",()=>{lang=lang==="fr"?"en":"fr";applyLang();});
 $("fab").addEventListener("click",()=>{
-  // Géoloc immédiate puis ouvre le modal
+  // Ouvrir la modal immédiatement avec la position connue
+  // La géoloc se met à jour en arrière-plan si possible
   if(navigator.geolocation){
-    navigator.geolocation.getCurrentPosition(
-      p=>{ userLat=p.coords.latitude; userLng=p.coords.longitude; $("loc-text").textContent=t().locDetected; },
-      ()=>{ const c=mapInstance.getCenter(); userLat=c.lat; userLng=c.lng; $("loc-text").textContent=lang==="fr"?"Centre de la carte":"Map center"; },
-      {timeout:3000, maximumAge:60000}
-    );
+    // Essayer d'avoir la position fraîche, mais pas bloquant
+    const geoPromise = new Promise(resolve=>{
+      navigator.geolocation.getCurrentPosition(
+        p=>{ userLat=p.coords.latitude; userLng=p.coords.longitude; resolve(); },
+        ()=>resolve(), // Timeout → on utilise la position existante
+        {timeout:1500, maximumAge:30000}
+      );
+    });
+    // Ouvrir après max 1.5s quelle que soit la réponse géoloc
+    Promise.race([geoPromise, new Promise(r=>setTimeout(r,1500))]).then(()=>{
+      if(!userLat || !userLng){
+        const c=mapInstance.getCenter(); userLat=c.lat; userLng=c.lng;
+      }
+      if($("loc-text")) $("loc-text").textContent = t().locDetected;
+      openModal();
+    });
   } else {
-    const c=mapInstance.getCenter(); userLat=c.lat; userLng=c.lng;
+    if(mapInstance){ const c=mapInstance.getCenter(); userLat=c.lat; userLng=c.lng; }
+    openModal();
   }
-  openModal();
 });
 
 function showLocationChoice(){
