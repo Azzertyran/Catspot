@@ -56,9 +56,8 @@ input:focus,textarea:focus{outline:none}
 .maplibregl-ctrl-group{border-radius:10px!important;box-shadow:0 2px 8px rgba(0,0,0,0.15)!important;border:none!important}
 .maplibregl-ctrl-zoom-in,.maplibregl-ctrl-zoom-out{border:none!important}
 #map{position:absolute;top:0;left:0;right:0;bottom:0;z-index:2;pointer-events:none}
-.maplibregl-marker{will-change:auto}
-.cat-pin{position:relative;}
-.cat-pin.selected{box-shadow:0 0 0 3px #fff,0 0 0 5px var(--pin-color,#D4572A),0 6px 20px rgba(0,0,0,0.3)!important}
+.maplibregl-marker{will-change:auto!important;transform-origin:top left}
+.cat-pin.selected{outline:3px solid #fff;outline-offset:2px;box-shadow:0 0 0 5px var(--pin-color,#D4572A),0 6px 20px rgba(0,0,0,0.3)!important}
 .cat-pin.legend::after{content:"⭐";position:absolute;top:-5px;right:-5px;font-size:10px;pointer-events:none;line-height:1}
 
 /* Cat of day - caché par défaut */
@@ -928,13 +927,25 @@ function addCatMarker(cat){
   const size  = getCatPinSize(cat);
   const el = document.createElement("div");
   el.className = "cat-pin" + (cat.legend ? " legend" : "");
-  // transform:translate(-50%,-50%) centre visuellement le marqueur sur les coords
-  // MapLibre place l'élément en top-left et ne touche qu'à ses propres propriétés
-  // Le transform interne est stable car MapLibre n'y touche pas
-  el.style.cssText = `width:${size}px;height:${size}px;border-radius:50%;background:${color};border:2.5px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,0.25);display:flex;align-items:center;justify-content:center;font-size:${Math.round(size*0.52)}px;line-height:1;cursor:pointer;user-select:none;--pin-color:${color};transform:translate(-50%,-50%);will-change:auto`;
+  // PAS de transform CSS sur cet élément — MapLibre écrase tout transform
+  // anchor:"center" + offset:[0,0] = MapLibre centre via margin interne, stable au zoom
+  el.style.width  = size + "px";
+  el.style.height = size + "px";
+  el.style.borderRadius = "50%";
+  el.style.background = color;
+  el.style.border = "2.5px solid #fff";
+  el.style.boxShadow = "0 2px 8px rgba(0,0,0,0.25)";
+  el.style.display = "flex";
+  el.style.alignItems = "center";
+  el.style.justifyContent = "center";
+  el.style.fontSize = Math.round(size * 0.52) + "px";
+  el.style.lineHeight = "1";
+  el.style.cursor = "pointer";
+  el.style.userSelect = "none";
+  el.style.setProperty("--pin-color", color);
   el.textContent = "🐱";
-  el.addEventListener("click", e=>{e.stopPropagation(); openPopup({...cat,color});});
-  const marker = new maplibregl.Marker({element:el, anchor:"top-left"})
+  el.addEventListener("click", e => { e.stopPropagation(); openPopup({...cat, color}); });
+  const marker = new maplibregl.Marker({element: el, anchor: "center", offset: [0, 0]})
     .setLngLat([cat.lng, cat.lat])
     .addTo(mapInstance);
   markers[cat.id] = {marker, el, color};
@@ -1313,6 +1324,17 @@ async function postComment(catId){
   } catch(e){ showToast("❌ "+(lang==="fr"?"Erreur":"Error")); }
 }
 window.postComment=postComment;
+
+// ── EXPOSITION GLOBALE DES FONCTIONS (onclick inline) ─────────
+// Toutes les fonctions appelées depuis du HTML généré dynamiquement
+// doivent être sur window sinon les onclick inline échouent silencieusement
+window.toggleFeedLike = toggleFeedLike;
+window.toggleChallenge = toggleChallenge;
+window.selectChar = selectChar;
+window.selectEmoji = selectEmoji;
+window.showMyProfile = showMyProfile;
+window.signInWithGoogle = signInWithGoogle;
+window.signOut = signOut;
 
 // ── FILTRAGE INSULTES ─────────────────────────────────────────
 const BAD_WORDS=["merde","putain","connard","connasse","salope","enculé","pute","bite","niquer","nique","baise","con","conne","fdp","ntm","pd","fuck","shit","bitch","asshole","bastard","cunt","dick","cock","pussy","whore","faggot","retard","kys"];
