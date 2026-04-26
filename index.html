@@ -887,20 +887,20 @@ async function loadUserLikes(){
 }
 
 async function saveCat(catData){
-  try {
-    // Timeout 10s — si Supabase ne répond pas, on affiche une erreur
-    const timeout = new Promise((_,reject)=>setTimeout(()=>reject(new Error("Timeout — vérifie ta connexion")), 10000));
-    const insert = sb.from("cats").insert([catData]).select().single();
-    const {data,error} = await Promise.race([insert, timeout]);
-    if(error){
-      showToast("❌ "+error.message);
-      return null;
+  const doInsert = ()=>sb.from("cats").insert([catData]).select().single();
+  for(let attempt=1; attempt<=2; attempt++){
+    try {
+      const timeout = new Promise((_,reject)=>setTimeout(()=>reject(new Error("Timeout")), 30000));
+      const {data,error} = await Promise.race([doInsert(), timeout]);
+      if(error){ showToast("❌ "+error.message); return null; }
+      return data;
+    } catch(e){
+      if(attempt===2){ showToast("❌ "+(e.message||"Erreur réseau — réessaie")); return null; }
+      showToast("⏳ Tentative 2...");
+      await new Promise(r=>setTimeout(r,2000));
     }
-    return data;
-  } catch(e){
-    showToast("❌ "+(e.message||"Erreur de publication"));
-    return null;
   }
+  return null;
 }
 
 async function toggleLikeDB(catId, wasLiked){
