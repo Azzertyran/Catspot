@@ -74,7 +74,7 @@ input:focus,textarea:focus{outline:none}
 
 /* Badge rare */
 .badge-rare{display:inline-flex;align-items:center;gap:3px;background:linear-gradient(135deg,#7C3AED,#A78BFA);color:#fff;font-size:9px;font-weight:800;padding:2px 7px;border-radius:20px;text-transform:uppercase;letter-spacing:.5px}
-.feed-rare{margin:6px 14px 0;display:flex;gap:6px;flex-wrap:wrap}
+
 
 /* Missions quotidiennes */
 .mission-card{background:linear-gradient(135deg,#1C1915,#2E2820);border-radius:16px;padding:16px;display:flex;align-items:center;gap:14px;cursor:pointer;transition:transform .15s}
@@ -93,7 +93,7 @@ input:focus,textarea:focus{outline:none}
 .sos-card{background:#fff;border-radius:16px;padding:14px;margin-bottom:12px;box-shadow:0 2px 12px rgba(0,0,0,0.06);border:1.5px solid transparent}
 .sos-card.lost{border-color:#FECACA}
 .sos-card.found{border-color:#BBF7D0}
-.sos-card.resolved{opacity:.6;border-color:#E8E2DA}
+.sos-card
 .sos-badge-lost{background:#FEF2F2;color:#DC2626;font-size:10px;font-weight:800;padding:3px 8px;border-radius:20px;display:inline-flex;align-items:center;gap:3px}
 .sos-badge-found{background:#F0FDF4;color:#16A34A;font-size:10px;font-weight:800;padding:3px 8px;border-radius:20px;display:inline-flex;align-items:center;gap:3px}
 .partner-card{background:#fff;border-radius:14px;padding:13px;margin-bottom:10px;box-shadow:0 2px 10px rgba(0,0,0,0.06);display:flex;align-items:center;gap:12px;border:1.5px solid #E8E2DA}
@@ -111,7 +111,7 @@ input:focus,textarea:focus{outline:none}
 /* Cat popup */
 #cat-popup{position:absolute;bottom:0;left:0;right:0;background:var(--light);border-radius:22px 22px 0 0;box-shadow:0 -4px 32px rgba(0,0,0,0.15);z-index:10;transform:translateY(100%);transition:transform .3s cubic-bezier(.34,1.1,.64,1);pointer-events:auto;max-height:90vh;overflow-y:auto;padding-bottom:calc(var(--nav) + 70px)}
 #cat-popup.open{transform:translateY(0)}
-#cat-popup.expanded{transform:translateY(0)}
+#cat-popup
 .popup-handle{width:36px;height:4px;background:#ddd;border-radius:2px;margin:8px auto 14px;cursor:grab;flex-shrink:0}
 .popup-inner{padding:6px 18px 24px}
 .popup-row{display:flex;align-items:flex-start;gap:12px}
@@ -148,17 +148,17 @@ input:focus,textarea:focus{outline:none}
 .feed-avatar{width:40px;height:40px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:21px;flex-shrink:0;border:2px solid}
 .feed-catname{font-family:"Fraunces",serif;font-size:16px;font-weight:700}
 .feed-meta{font-size:11px;color:var(--muted);margin-top:2px}
-.feed-pin{margin-left:auto;font-size:18px}
+
 /* Photo feed : hauteur fixe, contain pour ne pas couper */
 .feed-photo{margin-top:12px;position:relative;background:#111;overflow:hidden;min-height:120px;max-height:320px;display:flex;align-items:center;justify-content:center;isolation:isolate}
 .feed-photo img{width:100%;max-height:320px;object-fit:contain;display:block;position:relative;z-index:1}
-.feed-photo-gradient{position:absolute;inset:0;pointer-events:none}
+
 .feed-photo-emoji{font-size:76px;padding:40px 0;position:relative;z-index:1}
 .feed-photo-loc{position:absolute;bottom:8px;left:10px;background:rgba(0,0,0,.38);color:rgba(255,255,255,.75);font-size:9px;font-weight:600;padding:3px 8px;border-radius:20px;backdrop-filter:blur(4px);z-index:2;letter-spacing:.3px}
 .feed-desc{font-size:13px;color:#666;padding:10px 14px 0;font-style:italic}
 .feed-actions{display:flex;align-items:center;justify-content:space-between;padding:10px 14px 13px;border-top:1px solid #f5f3f0;margin-top:10px}
 .feed-like-btn{display:flex;align-items:center;gap:5px;font-size:14px;font-weight:700}
-.feed-sightings{font-size:12px;color:var(--muted)}
+
 .feed-filter-btn{background:var(--warm);border:none;border-radius:20px;padding:6px 14px;font-size:12px;font-weight:700;color:var(--mid);cursor:pointer;font-family:'DM Sans',sans-serif;transition:all .2s}
 .feed-filter-btn.active{background:var(--terra);color:#fff}
 
@@ -174,9 +174,9 @@ input:focus,textarea:focus{outline:none}
 .ch-card{display:flex;align-items:center;gap:12px;background:#fff;border-radius:14px;padding:13px 15px;border:1.5px solid transparent;transition:all .2s;cursor:pointer}
 .ch-card.done{background:#F0FDF4;border-color:#86EFAC}
 .ch-card:active{transform:scale(.98)}
-.ch-card.auto-validated{border-color:#BFDBFE;background:#EFF6FF}
+.ch-card
 .ch-badge-auto{display:inline-flex;align-items:center;gap:3px;background:#3B82F6;color:#fff;font-size:8px;font-weight:800;padding:2px 6px;border-radius:10px;text-transform:uppercase;letter-spacing:.4px;margin-left:4px}
-.ch-badge-honour{display:inline-flex;align-items:center;gap:3px;background:#F59E0B;color:#fff;font-size:8px;font-weight:800;padding:2px 6px;border-radius:10px;text-transform:uppercase;letter-spacing:.4px;margin-left:4px}
+
 .ch-emoji{font-size:24px;width:32px;text-align:center}
 .ch-title{font-size:14px;font-weight:600;color:var(--dark)}
 .ch-pts{font-size:12px;color:var(--amber);font-weight:700;margin-top:2px}
@@ -371,27 +371,27 @@ input:focus,textarea:focus{outline:none}
       <div class="tab-scroll">
         <!-- Header SOS -->
         <div style="background:linear-gradient(135deg,#DC2626,#EF4444);padding:20px 16px 16px;color:#fff">
-          <div style="font-family:'Fraunces',serif;font-size:22px;font-weight:700">🆘 SOS Chats</div>
-          <div style="font-size:12px;opacity:.8;margin-top:3px">Chats perdus, trouvés, et aide d'urgence</div>
+          <div style="font-family:'Fraunces',serif;font-size:22px;font-weight:700" id="sos-title">🆘 SOS Chats</div>
+          <div style="font-size:12px;opacity:.8;margin-top:3px" id="sos-sub">Chats perdus, trouvés, et aide d'urgence</div>
         </div>
 
         <!-- Filtres -->
         <div style="display:flex;gap:8px;padding:12px 16px;background:#fff;border-bottom:1px solid #F0EDE8">
-          <button id="sos-filter-all" class="feed-filter-btn active" onclick="setSosFilter('all')">Tous</button>
-          <button id="sos-filter-lost" class="feed-filter-btn" onclick="setSosFilter('lost')">🔴 Perdus</button>
-          <button id="sos-filter-found" class="feed-filter-btn" onclick="setSosFilter('found')">🟢 Trouvés</button>
+          <button id="sos-filter-all" class="feed-filter-btn active" onclick="setSosFilter('all')" id="sos-btn-all">Tous</button>
+          <button id="sos-filter-lost" class="feed-filter-btn" onclick="setSosFilter('lost')" id="sos-btn-lost">🔴 Perdus</button>
+          <button id="sos-filter-found" class="feed-filter-btn" onclick="setSosFilter('found')" id="sos-btn-found">🟢 Trouvés</button>
         </div>
 
         <!-- Bouton signaler -->
         <div style="padding:12px 16px">
-          <button onclick="openSosModal()" style="width:100%;background:linear-gradient(135deg,#DC2626,#EF4444);color:#fff;border:none;border-radius:14px;padding:14px;font-size:15px;font-weight:700;cursor:pointer;font-family:'DM Sans',sans-serif;display:flex;align-items:center;justify-content:center;gap:8px">
+          <button onclick="openSosModal()" id="sos-signal-btn" style="width:100%;background:linear-gradient(135deg,#DC2626,#EF4444);color:#fff;border:none;border-radius:14px;padding:14px;font-size:15px;font-weight:700;cursor:pointer;font-family:'DM Sans',sans-serif;display:flex;align-items:center;justify-content:center;gap:8px">
             🐱 Signaler un chat perdu ou trouvé
           </button>
         </div>
 
         <!-- Vétos proches -->
         <div style="margin:0 16px 16px">
-          <div style="font-family:'Fraunces',serif;font-size:16px;font-weight:700;margin-bottom:10px">🏥 Vétérinaires proches</div>
+          <div style="font-family:'Fraunces',serif;font-size:16px;font-weight:700;margin-bottom:10px" id="sos-vets-title">🏥 Vétérinaires proches</div>
           <div id="partners-list"></div>
           <div style="display:flex;gap:8px;margin-top:10px">
             <button onclick="openMaps('vet')" style="flex:1;background:#fff;border:1.5px solid #E8E2DA;border-radius:12px;padding:11px;font-size:13px;font-weight:700;cursor:pointer;font-family:'DM Sans',sans-serif;display:flex;align-items:center;justify-content:center;gap:6px">
@@ -833,19 +833,15 @@ async function initAuth(){
     const {data, error} = await sb.auth.getSession();
     if(error){
       // Token invalide/expiré — nettoyer et repartir propre
-      console.warn("Session invalide, nettoyage:", error.message);
       await sb.auth.signOut().catch(()=>{});
       currentUser = null;
     } else if(data?.session?.user){
       currentUser = data.session.user;
-      console.log("initAuth: connecté", currentUser.user_metadata?.full_name||currentUser.email);
       await Promise.all([loadUserLikes(), loadUserProfile()]);
       await loadChallengesForUser();
     } else {
-      console.log("initAuth: non connecté");
     }
   } catch(e){
-    console.warn("initAuth error:", e);
     // Si refresh token invalide → nettoyer le storage Supabase
     if(e.message?.includes("Refresh Token") || e.message?.includes("refresh_token")){
       Object.keys(localStorage).filter(k=>k.startsWith("sb-")).forEach(k=>localStorage.removeItem(k));
@@ -857,7 +853,6 @@ async function initAuth(){
 
   // Écouter les changements d'auth
   sb.auth.onAuthStateChange(async (event, session)=>{
-    console.log("auth event:", event);
     currentUser = session?.user || null;
 
     if(event === "SIGNED_IN" && currentUser && !currentUser.is_anonymous){
@@ -891,7 +886,6 @@ async function initAuth(){
 async function signInWithGoogle(){
   try {
     const redirectTo = window.location.origin + window.location.pathname;
-    console.log("signInWithGoogle: redirectTo=", redirectTo);
     const {error} = await sb.auth.signInWithOAuth({
       provider:"google",
       options:{
@@ -913,7 +907,6 @@ async function signOut(){
   try {
     await sb.auth.signOut();
   } catch(e){
-    console.warn("signOut erreur:", e);
     // Retry une fois
     try { await sb.auth.signOut(); } catch(e2){}
   }
@@ -959,7 +952,6 @@ async function loadCats(){
     cats = (data||[])
       .filter(c => !deletedCatIds.has(c.id)) // Exclure les suppressions locales
       .map(c=>({...c, likes:c.likes_count||0, desc:c.description||c.desc||null}));
-    console.log("loadCats: "+cats.length+" chats chargés");
     // Charger les compteurs de commentaires
     await loadCommentCounts();
   } catch(e){ console.error("loadCats exception:", e); cats=[]; }
@@ -972,7 +964,7 @@ async function loadCommentCounts(){
     const {data} = await sb.from("comments").select("cat_id").in("cat_id", catIds);
     commentCounts = {};
     (data||[]).forEach(row=>{ commentCounts[row.cat_id] = (commentCounts[row.cat_id]||0)+1; });
-  } catch(e){ console.warn("loadCommentCounts:", e); }
+  } catch(e){ }
 }
 
 async function loadUserProfile(){
@@ -999,7 +991,7 @@ async function loadUserProfile(){
     }
     userProfile = {totalCats:catsCount||0, totalLikes, streak};
     renderProfile();
-  } catch(e){ console.warn("loadUserProfile:",e); }
+  } catch(e){ }
 }
 
 async function loadUserLikes(){
@@ -1042,37 +1034,25 @@ async function saveCat(catData){
 
 async function toggleLikeDB(catId, wasLiked){
   if(!isRealUser()){
-    // Mémoriser pour sync future si l'utilisateur se connecte
     const pending = JSON.parse(localStorage.getItem("catspot_pending_likes")||"[]");
     if(!wasLiked && !pending.includes(catId)) pending.push(catId);
     else { const i=pending.indexOf(catId); if(i>-1) pending.splice(i,1); }
     localStorage.setItem("catspot_pending_likes", JSON.stringify(pending));
-    // Mettre à jour likes_count en base même en anonyme
+    // Mettre à jour le compteur anonyme via proxy
     try {
       const cat = cats.find(c=>c.id===catId);
-      const newCount = Math.max(0, (cat?.likes_count||0));
-      await sb.from("cats").update({likes_count: newCount}).eq("id", catId);
-    } catch(e){ console.warn("toggleLikeDB anonyme:", e); }
+      await fetch("/api/like", {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({cat_id:catId, count:cat?.likes_count||0})});
+    } catch(e){}
     return;
   }
-  // Utilisateur Google connecté — sync Supabase
+  // Utilisateur connecté — via proxy
   try {
-    if(wasLiked){
-      await sb.from("likes").delete().eq("user_id",currentUser.id).eq("cat_id",catId);
-      await sb.rpc("decrement_likes", {cat_id: catId}).catch(async ()=>{
-        const cat = cats.find(c=>c.id===catId);
-        const newCount = Math.max(0, (cat?.likes_count||1)-1);
-        await sb.from("cats").update({likes_count: newCount}).eq("id", catId);
-      });
-    } else {
-      await sb.from("likes").insert([{user_id:currentUser.id, cat_id:catId}]);
-      await sb.rpc("increment_likes", {cat_id: catId}).catch(async ()=>{
-        const cat = cats.find(c=>c.id===catId);
-        const newCount = (cat?.likes_count||0)+1;
-        await sb.from("cats").update({likes_count: newCount}).eq("id", catId);
-      });
-    }
-  } catch(e){ console.error("toggleLikeDB erreur:", e); }
+    await fetch("/api/like", {
+      method: wasLiked ? "DELETE" : "POST",
+      headers: {"Content-Type":"application/json"},
+      body: JSON.stringify({cat_id:catId, user_id:currentUser.id, was_liked:wasLiked, likes_count: cats.find(c=>c.id===catId)?.likes_count||0})
+    });
+  } catch(e){ console.error("toggleLikeDB:", e); }
 }
 
 async function uploadPhoto(file, catId){
@@ -1088,10 +1068,10 @@ async function uploadPhoto(file, catId){
       },
       body: compressed
     });
-    if(!response.ok){ console.warn("uploadPhoto erreur:", response.status); return null; }
+    if(!response.ok){ return null; }
     const data = await response.json();
     return data?.publicUrl || null;
-  } catch(e){ console.warn("uploadPhoto exception:", e); return null; }
+  } catch(e){ return null; }
 }
 
 function compressImage(file, maxPx=800, quality=0.75){
@@ -1642,8 +1622,6 @@ window.postComment=postComment;
 window.toggleFeedLike = toggleFeedLike;
 window.toggleChallenge = toggleChallenge;
 window.selectChar = selectChar;
-window.selectEmoji = selectEmoji;
-window.showMyProfile = showMyProfile;
 window.signInWithGoogle = signInWithGoogle;
 window.signOut = signOut;
 
@@ -1654,10 +1632,13 @@ let sosPhotoFile = null;
 let sosAnnonces = [];
 let partners = [];
 
-async function loadSosData(){
+let deletedSosIds = new Set(JSON.parse(localStorage.getItem("catspot_deleted_sos")||"[]"));
+
+async function loadSosData(force=false){
+  if(!force && sosAnnonces.length > 0) return; // Déjà chargé — pas de reload
   try {
     const {data} = await sb.from("lost_cats").select("*").order("created_at",{ascending:false});
-    sosAnnonces = data || [];
+    sosAnnonces = (data||[]).filter(a=>!deletedSosIds.has(a.id));
   } catch(e){ sosAnnonces = []; }
   try {
     const {data} = await sb.from("partners").select("*").eq("is_active",true).order("is_featured",{ascending:false});
@@ -1765,12 +1746,10 @@ window.deleteSos = deleteSos;
 async function deleteSosFromDB(id){
   try {
     const res = await fetch(`/api/delete-sos?id=${id}`, {method:"DELETE"});
-    if(!res.ok){
-      // Fallback direct
-      await sb.from("lost_cats").delete().eq("id", id);
-    }
-  } catch(e){ console.warn("deleteSos:", e); }
-  // Supprimer localement dans tous les cas
+    if(!res.ok) await sb.from("lost_cats").delete().eq("id", id);
+  } catch(e){ }
+  deletedSosIds.add(id);
+  try { localStorage.setItem("catspot_deleted_sos", JSON.stringify([...deletedSosIds])); } catch(e){}
   sosAnnonces = sosAnnonces.filter(a=>a.id!==id);
   renderSos();
   showToast("🗑️ "+(lang==="fr"?"Annonce supprimée":"Announcement deleted"));
@@ -2512,6 +2491,14 @@ function applyLang(){
   const fn=$("feed-filter-nearby"); if(fn) fn.textContent=t().feedNearby;
   // Bouton modifier pseudo
   const ep=$("edit-pseudo-btn"); if(ep) ep.textContent=t().editPseudo;
+  // SOS
+  const sosT=$("sos-title"); if(sosT) sosT.textContent="🆘 "+t().sosTitle;
+  const sosS=$("sos-sub"); if(sosS) sosS.textContent=t().sosSub;
+  const sosA=$("sos-filter-all"); if(sosA) sosA.textContent=t().sosAll;
+  const sosL=$("sos-filter-lost"); if(sosL) sosL.textContent=t().sosLost;
+  const sosF=$("sos-filter-found"); if(sosF) sosF.textContent=t().sosFound;
+  const sosB=$("sos-signal-btn"); if(sosB) sosB.textContent=t().sosBtn;
+  const sosV=$("sos-vets-title"); if(sosV) sosV.textContent=t().sosVets;
   updateAuthUI();
   if(currentTab==="feed") renderFeed();
   if(currentTab==="challenges") renderChallenges();
@@ -2808,7 +2795,7 @@ if(navigator.geolocation){
     }
     if(currentTab==="feed") renderFeed();
     renderProfile();
-  } catch(e){ console.warn("Init background error:", e); }
+  } catch(e){ }
 })();
 </script>
 </body>
