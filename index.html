@@ -56,9 +56,9 @@ input:focus,textarea:focus{outline:none}
 .maplibregl-ctrl-group{border-radius:10px!important;box-shadow:0 2px 8px rgba(0,0,0,0.15)!important;border:none!important}
 .maplibregl-ctrl-zoom-in,.maplibregl-ctrl-zoom-out{border:none!important}
 #map{position:absolute;top:0;left:0;right:0;bottom:0;z-index:2;pointer-events:none}
-.maplibregl-marker{will-change:transform}
+.maplibregl-marker{will-change:auto}
 .cat-pin{position:relative;}
-.cat-pin.selected{box-shadow:0 0 0 3px #fff,0 0 0 5px var(--pin-color,#D4572A),0 6px 20px rgba(0,0,0,0.3)!important;transform:scale(1.1)}
+.cat-pin.selected{box-shadow:0 0 0 3px #fff,0 0 0 5px var(--pin-color,#D4572A),0 6px 20px rgba(0,0,0,0.3)!important}
 .cat-pin.legend::after{content:"⭐";position:absolute;top:-5px;right:-5px;font-size:10px;pointer-events:none;line-height:1}
 
 /* Cat of day - caché par défaut */
@@ -630,7 +630,6 @@ async function initAuth(){
 
     if(event === "SIGNED_IN" && currentUser && !currentUser.is_anonymous){
       likes = {};
-      localStorage.removeItem("catspot_likes"); // Supabase est la source de vérité quand connecté
       await Promise.all([loadUserLikes(), loadUserProfile()]);
       await loadChallengesForUser(); // Récupérer les défis depuis Supabase
       await loadCats();
@@ -644,10 +643,12 @@ async function initAuth(){
     if(event === "SIGNED_OUT"){
       currentUser = null;
       likes = {};
-      loadLikesFromStorage(); // Restaurer les likes locaux après déconnexion
+      loadLikesFromStorage();
       userProfile = {totalCats:0, streak:0, totalLikes:0};
       $("profile-avatar").innerHTML = "🐱";
       $("profile-name").textContent = "CatSpotter";
+      const editBtn = $("edit-pseudo-btn");
+      if(editBtn) editBtn.style.display = "none";
       updateAuthUI();
       renderProfile();
       if(currentTab==="feed") renderFeed();
@@ -790,19 +791,25 @@ async function saveCat(catData){
 }
 
 async function toggleLikeDB(catId, wasLiked){
-  if(!currentUser){
-    // Sauvegarder en localStorage pour syncer à la reconnexion
+  if(!isRealUser()){
+    // Mémoriser pour sync future si l'utilisateur se connecte
     const pending = JSON.parse(localStorage.getItem("catspot_pending_likes")||"[]");
     if(!wasLiked && !pending.includes(catId)) pending.push(catId);
     else { const i=pending.indexOf(catId); if(i>-1) pending.splice(i,1); }
     localStorage.setItem("catspot_pending_likes", JSON.stringify(pending));
+    // Mettre à jour likes_count en base même en anonyme
+    try {
+      const cat = cats.find(c=>c.id===catId);
+      const newCount = Math.max(0, (cat?.likes_count||0));
+      await sb.from("cats").update({likes_count: newCount}).eq("id", catId);
+    } catch(e){ console.warn("toggleLikeDB anonyme:", e); }
     return;
   }
+  // Utilisateur Google connecté — sync Supabase
   try {
     if(wasLiked){
       await sb.from("likes").delete().eq("user_id",currentUser.id).eq("cat_id",catId);
       await sb.rpc("decrement_likes", {cat_id: catId}).catch(async ()=>{
-        // Fallback si pas de fonction RPC : mise à jour manuelle
         const cat = cats.find(c=>c.id===catId);
         const newCount = Math.max(0, (cat?.likes_count||1)-1);
         await sb.from("cats").update({likes_count: newCount}).eq("id", catId);
@@ -810,7 +817,6 @@ async function toggleLikeDB(catId, wasLiked){
     } else {
       await sb.from("likes").insert([{user_id:currentUser.id, cat_id:catId, sighting_id:null}]);
       await sb.rpc("increment_likes", {cat_id: catId}).catch(async ()=>{
-        // Fallback si pas de fonction RPC : mise à jour manuelle
         const cat = cats.find(c=>c.id===catId);
         const newCount = (cat?.likes_count||0)+1;
         await sb.from("cats").update({likes_count: newCount}).eq("id", catId);
@@ -920,11 +926,12 @@ function getCatPinSize(cat){
 function addCatMarker(cat){
   const color = getCatPinColor(cat);
   const size  = getCatPinSize(cat);
-  // Wrapper à la taille du cercle — MapLibre applique transform sur cet élément
-  // On utilise margin négatif pour centrer sans affecter le transform
   const el = document.createElement("div");
   el.className = "cat-pin" + (cat.legend ? " legend" : "");
-  el.style.cssText = `width:${size}px;height:${size}px;margin-left:-${Math.round(size/2)}px;margin-top:-${Math.round(size/2)}px;border-radius:50%;background:${color};border:2.5px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,0.25);display:flex;align-items:center;justify-content:center;font-size:${Math.round(size*0.52)}px;line-height:1;cursor:pointer;user-select:none;--pin-color:${color}`;
+  // transform:translate(-50%,-50%) centre visuellement le marqueur sur les coords
+  // MapLibre place l'élément en top-left et ne touche qu'à ses propres propriétés
+  // Le transform interne est stable car MapLibre n'y touche pas
+  el.style.cssText = `width:${size}px;height:${size}px;border-radius:50%;background:${color};border:2.5px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,0.25);display:flex;align-items:center;justify-content:center;font-size:${Math.round(size*0.52)}px;line-height:1;cursor:pointer;user-select:none;--pin-color:${color};transform:translate(-50%,-50%);will-change:auto`;
   el.textContent = "🐱";
   el.addEventListener("click", e=>{e.stopPropagation(); openPopup({...cat,color});});
   const marker = new maplibregl.Marker({element:el, anchor:"top-left"})
@@ -935,15 +942,14 @@ function addCatMarker(cat){
 
 function updateCatOfDay(){
   if(!cats.length){$("cod-banner").classList.remove("visible");return;}
-  const best=cats.reduce((a,b)=>((b.likes_count||0)>(a.likes_count||0)?b:a),cats[0]);
+  // Trier par likes_count local (mis à jour à chaque toggle)
+  const sorted = [...cats].sort((a,b)=>(b.likes_count||0)-(a.likes_count||0));
+  const best = sorted[0];
   if((best.likes_count||0)===0){$("cod-banner").classList.remove("visible");return;}
-  $("cod-label").textContent=t().codLabel;
-  $("cod-name").textContent=best.name||"Inconnu";
-  // Compteur avec likes locaux inclus
-  const realLikes = best.likes_count || 0;
-  $("cod-likes").textContent = realLikes + " " + t().likes;
+  $("cod-label").textContent = t().codLabel;
+  $("cod-name").textContent = best.name || "Inconnu";
+  $("cod-likes").textContent = (best.likes_count||0) + " " + t().likes;
   $("cod-banner").classList.add("visible");
-  // Rendre cliquable — ouvre la popup du chat
   $("cod-banner").onclick = ()=>{
     const color = getCatPinColor(best);
     openPopup({...best, color});
@@ -1427,30 +1433,37 @@ function renderFeed(append=false){
   }
 }
 
+// Retourne le likes_count à afficher (Supabase + ajustement local anonyme)
+function displayLikes(cat){
+  return cat.likes_count || 0;
+}
+
 function toggleFeedLike(id){
   const wasLiked = !!likes[id];
   likes[id] = !wasLiked;
   const cat = cats.find(c=>c.id===id);
   if(!cat) return;
-  // likes_count = valeur Supabase, on ajuste localement
+  // Ajuster likes_count local pour affichage immédiat
   cat.likes_count = Math.max(0, (cat.likes_count||0) + (likes[id] ? 1 : -1));
   const btn = $("fl-"+id);
-  if(btn){ btn.innerHTML = (likes[id]?"❤️":"🤍")+" "+(cat.likes_count)+" "+t().likes; btn.style.color = likes[id]?"#D4572A":"#8A7F72"; }
+  if(btn){ btn.innerHTML = (likes[id]?"❤️":"🤍")+" "+cat.likes_count+" "+t().likes; btn.style.color = likes[id]?"#D4572A":"#8A7F72"; }
   if(selectedCat?.id===id){ selectedCat.likes_count = cat.likes_count; updatePopupLike(selectedCat); }
   saveLikesToStorage();
+  updateCatOfDay();
   toggleLikeDB(id, wasLiked);
 }
 
+function isRealUser(){
+  // Utilisateur vraiment connecté avec Google (pas anonyme Supabase)
+  return currentUser && !currentUser.is_anonymous && currentUser.app_metadata?.provider !== "anonymous";
+}
+
 function saveLikesToStorage(){
-  // Ne persister en localStorage que si non connecté (anonyme)
-  // Si connecté, Supabase est la source de vérité
-  if(currentUser && !currentUser.is_anonymous) return;
+  // Toujours sauvegarder en localStorage — source de vérité locale
   try { localStorage.setItem("catspot_likes", JSON.stringify(likes)); } catch(e){}
 }
 
 function loadLikesFromStorage(){
-  // Ne charger le localStorage que si non connecté
-  if(currentUser && !currentUser.is_anonymous) return;
   try {
     const saved = localStorage.getItem("catspot_likes");
     if(saved) { const parsed = JSON.parse(saved); Object.assign(likes, parsed); }
@@ -1912,6 +1925,7 @@ $("popup-like-btn").addEventListener("click",async ()=>{
   const btn = $("fl-"+id);
   if(btn&&cat){ btn.innerHTML=(likes[id]?"❤️":"🤍")+" "+cat.likes_count+" "+t().likes; btn.style.color=likes[id]?"#D4572A":"#8A7F72"; }
   saveLikesToStorage();
+  updateCatOfDay();
   await toggleLikeDB(id, wasLiked);
 });
 $("popup-respott-btn").addEventListener("click",(e)=>{ e.stopPropagation(); if(selectedCat) reSpot(selectedCat.id); });
