@@ -1,0 +1,543 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Catspot — Le radar à chats de votre quartier</title>
+<meta name="description" content="Photographiez et partagez les chats de votre quartier. Carte interactive, feed communautaire, onglet SOS."/>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800&family=DM+Sans:ital,wght@0,300;0,400;0,500;1,300&display=swap" rel="stylesheet"/>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --terra:#D4572A;
+  --amber:#C9853A;
+  --warm:#F5EFE6;
+  --cream:#FAF7F2;
+  --dark:#1A1208;
+  --mid:#3D2B1A;
+  --muted:#8B7355;
+  --light:#E8E2DA;
+}
+html{scroll-behavior:smooth}
+body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--dark);overflow-x:hidden}
+
+/* ── NAV ── */
+nav{
+  position:fixed;top:0;left:0;right:0;z-index:100;
+  display:flex;align-items:center;justify-content:space-between;
+  padding:16px 40px;
+  background:rgba(250,247,242,0.85);
+  backdrop-filter:blur(12px);
+  border-bottom:1px solid var(--light);
+}
+.nav-logo{display:flex;align-items:center;gap:10px;text-decoration:none}
+.nav-logo span{font-family:'Syne',sans-serif;font-weight:800;font-size:20px;color:var(--dark)}
+.nav-logo span em{color:var(--terra);font-style:normal}
+.paw-icon{width:32px;height:32px}
+.nav-cta{
+  background:var(--terra);color:#fff;
+  border:none;border-radius:40px;
+  padding:10px 22px;font-size:14px;font-weight:500;
+  font-family:'DM Sans',sans-serif;cursor:pointer;
+  text-decoration:none;
+  transition:transform 0.15s,box-shadow 0.15s;
+}
+.nav-cta:hover{transform:translateY(-1px);box-shadow:0 4px 16px rgba(212,87,42,.3)}
+
+/* ── HERO ── */
+.hero{
+  min-height:100vh;display:flex;align-items:center;
+  padding:120px 40px 80px;
+  position:relative;overflow:hidden;
+}
+.hero-bg{
+  position:absolute;inset:0;
+  background:
+    radial-gradient(ellipse 700px 500px at 70% 50%, rgba(212,87,42,.07) 0%, transparent 70%),
+    radial-gradient(ellipse 400px 400px at 20% 80%, rgba(201,133,58,.05) 0%, transparent 60%);
+}
+.hero-floating{
+  position:absolute;top:0;right:0;bottom:0;width:50%;
+  display:flex;align-items:center;justify-content:center;
+  pointer-events:none;
+}
+.phone-mockup{
+  width:260px;height:520px;
+  background:var(--dark);
+  border-radius:40px;
+  box-shadow:0 40px 80px rgba(26,18,8,.25),0 0 0 1px rgba(255,255,255,.1);
+  position:relative;overflow:hidden;
+  animation:float 6s ease-in-out infinite;
+}
+@keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-12px)}}
+.phone-notch{
+  position:absolute;top:16px;left:50%;transform:translateX(-50%);
+  width:80px;height:24px;background:#000;border-radius:20px;z-index:10;
+}
+.phone-screen{
+  position:absolute;inset:0;
+  background:linear-gradient(160deg,#2A1A0E 0%,#1A0E06 100%);
+  display:flex;flex-direction:column;
+  padding:60px 12px 16px;
+  gap:8px;
+}
+.phone-map{
+  flex:1;background:linear-gradient(135deg,#2D4A3E 0%,#1E3329 100%);
+  border-radius:16px;position:relative;overflow:hidden;
+}
+.map-dot{position:absolute;border-radius:50%;animation:pulse 2s ease-in-out infinite}
+.map-dot.d1{width:32px;height:32px;background:rgba(212,87,42,.9);top:40%;left:45%;font-size:16px;display:flex;align-items:center;justify-content:center}
+.map-dot.d2{width:28px;height:28px;background:rgba(201,133,58,.8);top:20%;left:65%;font-size:13px;display:flex;align-items:center;justify-content:center;animation-delay:.5s}
+.map-dot.d3{width:24px;height:24px;background:rgba(212,87,42,.7);top:65%;left:28%;font-size:11px;display:flex;align-items:center;justify-content:center;animation-delay:1s}
+@keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.1)}}
+.phone-card{
+  background:rgba(255,255,255,.06);border-radius:12px;
+  padding:10px;display:flex;align-items:center;gap:8px;
+}
+.phone-card-ava{
+  width:36px;height:36px;border-radius:10px;
+  background:linear-gradient(135deg,var(--terra),var(--amber));
+  font-size:18px;display:flex;align-items:center;justify-content:center;
+  flex-shrink:0;
+}
+.phone-card-txt{flex:1}
+.phone-card-name{font-size:11px;font-weight:700;color:#fff;margin-bottom:2px}
+.phone-card-sub{font-size:9px;color:rgba(255,255,255,.5)}
+.phone-card-like{font-size:10px;color:rgba(255,255,255,.4);display:flex;align-items:center;gap:3px}
+
+.hero-content{position:relative;z-index:1;max-width:540px}
+.hero-pill{
+  display:inline-flex;align-items:center;gap:8px;
+  background:rgba(212,87,42,.1);border:1px solid rgba(212,87,42,.2);
+  border-radius:40px;padding:6px 14px;
+  font-size:13px;color:var(--terra);font-weight:500;
+  margin-bottom:24px;
+}
+h1{
+  font-family:'Syne',sans-serif;font-weight:800;
+  font-size:clamp(40px,5vw,64px);line-height:1.05;
+  margin-bottom:24px;
+}
+h1 em{color:var(--terra);font-style:normal}
+.hero-desc{
+  font-size:18px;font-weight:300;color:var(--muted);
+  line-height:1.7;margin-bottom:40px;max-width:440px;
+}
+.hero-actions{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
+.btn-primary{
+  display:inline-flex;align-items:center;gap:8px;
+  background:var(--terra);color:#fff;
+  border:none;border-radius:40px;
+  padding:16px 32px;font-size:16px;font-weight:500;
+  font-family:'DM Sans',sans-serif;cursor:pointer;
+  text-decoration:none;
+  transition:transform 0.15s,box-shadow 0.15s;
+}
+.btn-primary:hover{transform:translateY(-2px);box-shadow:0 8px 24px rgba(212,87,42,.35)}
+.btn-secondary{
+  display:inline-flex;align-items:center;gap:8px;
+  background:transparent;color:var(--mid);
+  border:1.5px solid var(--light);border-radius:40px;
+  padding:15px 28px;font-size:16px;font-weight:400;
+  font-family:'DM Sans',sans-serif;cursor:pointer;
+  text-decoration:none;
+  transition:border-color 0.15s,background 0.15s;
+}
+.btn-secondary:hover{border-color:var(--muted);background:var(--warm)}
+.hero-stats{
+  display:flex;gap:32px;margin-top:48px;padding-top:40px;
+  border-top:1px solid var(--light);
+}
+.stat-num{font-family:'Syne',sans-serif;font-size:28px;font-weight:800;color:var(--dark)}
+.stat-label{font-size:13px;color:var(--muted);margin-top:2px}
+
+/* ── HOW IT WORKS ── */
+.section{padding:100px 40px}
+.section-label{
+  font-size:12px;font-weight:700;letter-spacing:2px;text-transform:uppercase;
+  color:var(--terra);margin-bottom:16px;
+}
+.section-title{
+  font-family:'Syne',sans-serif;font-weight:800;
+  font-size:clamp(32px,4vw,48px);line-height:1.1;
+  margin-bottom:16px;
+}
+.section-sub{font-size:17px;color:var(--muted);font-weight:300;line-height:1.6;max-width:520px}
+.how-grid{
+  display:grid;grid-template-columns:repeat(3,1fr);gap:2px;
+  margin-top:64px;background:var(--light);border-radius:20px;overflow:hidden;
+}
+.how-step{
+  background:var(--cream);padding:48px 36px;
+  position:relative;
+  transition:background 0.2s;
+}
+.how-step:hover{background:var(--warm)}
+.step-num{
+  font-family:'Syne',sans-serif;font-size:56px;font-weight:800;
+  color:var(--light);line-height:1;margin-bottom:24px;
+}
+.step-icon{font-size:36px;margin-bottom:16px}
+.step-title{font-family:'Syne',sans-serif;font-weight:700;font-size:20px;margin-bottom:12px}
+.step-desc{font-size:15px;color:var(--muted);line-height:1.6;font-weight:300}
+
+/* ── FEATURES ── */
+.features{padding:100px 40px;background:var(--warm)}
+.feat-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:24px;margin-top:64px}
+.feat-card{
+  background:var(--cream);border-radius:20px;padding:36px;
+  border:1px solid var(--light);
+  transition:transform 0.2s,box-shadow 0.2s;
+}
+.feat-card:hover{transform:translateY(-4px);box-shadow:0 16px 40px rgba(26,18,8,.08)}
+.feat-card.big{grid-column:span 2}
+.feat-icon{
+  width:52px;height:52px;border-radius:14px;
+  background:linear-gradient(135deg,rgba(212,87,42,.12),rgba(201,133,58,.08));
+  display:flex;align-items:center;justify-content:center;
+  font-size:24px;margin-bottom:20px;
+}
+.feat-title{font-family:'Syne',sans-serif;font-weight:700;font-size:20px;margin-bottom:10px}
+.feat-desc{font-size:15px;color:var(--muted);line-height:1.6;font-weight:300}
+.feat-big-inner{display:grid;grid-template-columns:1fr 1fr;gap:48px;align-items:center}
+.feat-big-map{
+  height:220px;background:linear-gradient(135deg,#2D4A3E 0%,#1E3329 100%);
+  border-radius:16px;position:relative;overflow:hidden;
+}
+.feat-big-map::before{
+  content:'';position:absolute;inset:0;
+  background:radial-gradient(ellipse at 60% 40%,rgba(212,87,42,.15),transparent 60%);
+}
+.map-marker{position:absolute;width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px}
+.m1{background:rgba(212,87,42,.9);top:38%;left:40%}
+.m2{background:rgba(201,133,58,.8);top:22%;left:60%}
+.m3{background:rgba(212,87,42,.7);top:62%;left:28%}
+.m4{background:rgba(139,115,85,.6);top:50%;left:68%}
+.m5{background:rgba(212,87,42,.8);top:18%;left:22%}
+
+/* ── SOS ── */
+.sos-section{padding:100px 40px}
+.sos-inner{
+  background:linear-gradient(135deg,#3D0A0A,#1A0505);
+  border-radius:28px;padding:72px;
+  display:grid;grid-template-columns:1fr 1fr;gap:64px;align-items:center;
+}
+.sos-content .section-label{color:#F87171}
+.sos-content .section-title{color:#fff}
+.sos-content .section-sub{color:rgba(255,255,255,.5)}
+.sos-cards{display:flex;flex-direction:column;gap:12px}
+.sos-card{
+  background:rgba(255,255,255,.06);border-radius:16px;padding:20px;
+  display:flex;align-items:center;gap:16px;
+  border:1px solid rgba(255,255,255,.08);
+}
+.sos-card-badge{
+  width:44px;height:44px;border-radius:12px;flex-shrink:0;
+  display:flex;align-items:center;justify-content:center;font-size:20px;
+}
+.sos-card-badge.lost{background:rgba(248,113,113,.15)}
+.sos-card-badge.found{background:rgba(74,222,128,.15)}
+.sos-card-txt strong{display:block;color:#fff;font-size:14px;font-weight:500;margin-bottom:3px}
+.sos-card-txt span{font-size:12px;color:rgba(255,255,255,.4)}
+
+/* ── INSTALL ── */
+.install{padding:100px 40px;background:var(--dark)}
+.install-inner{max-width:700px;margin:0 auto;text-align:center}
+.install .section-label{color:rgba(212,87,42,.8)}
+.install .section-title{color:#fff}
+.install .section-sub{color:rgba(255,255,255,.4);margin:0 auto 56px}
+.install-steps{
+  display:grid;grid-template-columns:repeat(3,1fr);gap:32px;
+  margin-bottom:56px;
+}
+.install-step{text-align:center}
+.install-step-num{
+  width:48px;height:48px;border-radius:50%;
+  background:rgba(212,87,42,.15);border:1px solid rgba(212,87,42,.2);
+  display:flex;align-items:center;justify-content:center;
+  font-family:'Syne',sans-serif;font-weight:800;font-size:18px;
+  color:var(--terra);margin:0 auto 16px;
+}
+.install-step-title{color:#fff;font-size:15px;font-weight:500;margin-bottom:8px}
+.install-step-desc{font-size:13px;color:rgba(255,255,255,.35);line-height:1.6}
+.os-badges{display:flex;gap:12px;justify-content:center;flex-wrap:wrap}
+.os-badge{
+  display:inline-flex;align-items:center;gap:10px;
+  background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);
+  border-radius:12px;padding:12px 20px;
+  font-size:14px;color:rgba(255,255,255,.7);
+  transition:background 0.15s,border-color 0.15s;
+  text-decoration:none;
+}
+.os-badge:hover{background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.2)}
+.os-badge-icon{font-size:20px}
+
+/* ── FOOTER ── */
+footer{
+  padding:40px;display:flex;align-items:center;justify-content:space-between;
+  border-top:1px solid var(--light);
+  font-size:13px;color:var(--muted);
+}
+footer a{color:var(--muted);text-decoration:none}
+footer a:hover{color:var(--terra)}
+.footer-logo{font-family:'Syne',sans-serif;font-weight:800;font-size:16px;color:var(--dark)}
+.footer-logo em{color:var(--terra);font-style:normal}
+
+/* ── RESPONSIVE ── */
+@media(max-width:900px){
+  nav{padding:14px 20px}
+  .hero{padding:100px 20px 60px;flex-direction:column;min-height:auto}
+  .hero-floating{position:relative;width:100%;height:360px;margin-top:48px}
+  .phone-mockup{width:200px;height:400px}
+  .hero-stats{flex-wrap:wrap;gap:20px}
+  .how-grid{grid-template-columns:1fr}
+  .feat-grid{grid-template-columns:1fr}
+  .feat-card.big{grid-column:span 1}
+  .feat-big-inner{grid-template-columns:1fr}
+  .sos-inner{grid-template-columns:1fr;padding:40px 24px;gap:40px}
+  .install-steps{grid-template-columns:1fr}
+  .section{padding:60px 20px}
+  .features,.sos-section,.install{padding:60px 20px}
+  footer{flex-direction:column;gap:16px;text-align:center}
+}
+</style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav>
+  <a href="#" class="nav-logo">
+    <svg class="paw-icon" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="16" cy="17" r="9" fill="#D4572A"/>
+      <ellipse cx="9" cy="9" rx="3.5" ry="4.5" fill="#D4572A"/>
+      <ellipse cx="23" cy="9" rx="3.5" ry="4.5" fill="#D4572A"/>
+      <ellipse cx="5" cy="16" rx="3" ry="3.5" fill="#C9853A"/>
+      <ellipse cx="27" cy="16" rx="3" ry="3.5" fill="#C9853A"/>
+    </svg>
+    <span>Cat<em>spot</em></span>
+  </a>
+  <a href="/app.html" class="nav-cta">Ouvrir l'app →</a>
+</nav>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="hero-bg"></div>
+  <div class="hero-content">
+    <div class="hero-pill">🐾 Disponible maintenant · Gratuit</div>
+    <h1>Le <em>radar à chats</em><br/>de votre quartier</h1>
+    <p class="hero-desc">Photographiez les chats que vous croisez, partagez-les sur la carte et rejoignez la communauté des passionnés près de chez vous.</p>
+    <div class="hero-actions">
+      <a href="/app.html" class="btn-primary">🐾 Ouvrir Catspot</a>
+      <a href="#comment" class="btn-secondary">Comment ça marche</a>
+    </div>
+    <div class="hero-stats">
+      <div>
+        <div class="stat-num">100%</div>
+        <div class="stat-label">Gratuit, sans pub</div>
+      </div>
+      <div>
+        <div class="stat-num">PWA</div>
+        <div class="stat-label">iOS &amp; Android</div>
+      </div>
+      <div>
+        <div class="stat-num">Local</div>
+        <div class="stat-label">Votre quartier</div>
+      </div>
+    </div>
+  </div>
+  <div class="hero-floating">
+    <div class="phone-mockup">
+      <div class="phone-notch"></div>
+      <div class="phone-screen">
+        <div class="phone-map">
+          <div class="map-dot d1">🐱</div>
+          <div class="map-dot d2">🐈</div>
+          <div class="map-dot d3">🐾</div>
+        </div>
+        <div class="phone-card">
+          <div class="phone-card-ava">🐱</div>
+          <div class="phone-card-txt">
+            <div class="phone-card-name">Moustache · rue Thiers</div>
+            <div class="phone-card-sub">Posté il y a 3 min par Alice</div>
+          </div>
+          <div class="phone-card-like">❤️ 12</div>
+        </div>
+        <div class="phone-card">
+          <div class="phone-card-ava">🐈</div>
+          <div class="phone-card-txt">
+            <div class="phone-card-name">Chat roux · place Leclerc</div>
+            <div class="phone-card-sub">Posté il y a 8 min par Thomas</div>
+          </div>
+          <div class="phone-card-like">❤️ 7</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- HOW IT WORKS -->
+<section class="section" id="comment">
+  <div class="section-label">Comment ça marche</div>
+  <div class="section-title">Simple comme<br/>un clic</div>
+  <div class="how-grid">
+    <div class="how-step">
+      <div class="step-num">01</div>
+      <div class="step-icon">📸</div>
+      <div class="step-title">Spottez</div>
+      <p class="step-desc">Vous croisez un chat ? Ouvrez Catspot, prenez une photo et publiez votre spot en quelques secondes.</p>
+    </div>
+    <div class="how-step">
+      <div class="step-num">02</div>
+      <div class="step-icon">🗺️</div>
+      <div class="step-title">Explorez</div>
+      <p class="step-desc">Découvrez les chats du quartier sur la carte interactive. Chaque marqueur est un chat réel, posté par quelqu'un près de chez vous.</p>
+    </div>
+    <div class="how-step">
+      <div class="step-num">03</div>
+      <div class="step-icon">🏆</div>
+      <div class="step-title">Progressez</div>
+      <p class="step-desc">Relevez des défis quotidiens, gagnez des badges et montez en niveau. Plus vous spottez, plus votre profil s'enrichit.</p>
+    </div>
+  </div>
+</section>
+
+<!-- FEATURES -->
+<section class="features">
+  <div class="section-label">Fonctionnalités</div>
+  <div class="section-title">Tout ce qu'il faut<br/>pour les amoureux des chats</div>
+  <div class="feat-grid">
+    <div class="feat-card big">
+      <div class="feat-big-inner">
+        <div>
+          <div class="feat-icon">🗺️</div>
+          <div class="feat-title">Carte interactive en temps réel</div>
+          <p class="feat-desc">Les chats apparaissent sur une carte dynamique avec des marqueurs colorés par fraîcheur. Plus le spot est récent, plus il brille. Filtrez par distance et naviguez dans votre quartier.</p>
+        </div>
+        <div class="feat-big-map">
+          <div class="map-marker m1">🐱</div>
+          <div class="map-marker m2">🐈</div>
+          <div class="map-marker m3">🐾</div>
+          <div class="map-marker m4">🐱</div>
+          <div class="map-marker m5">🐈</div>
+        </div>
+      </div>
+    </div>
+    <div class="feat-card">
+      <div class="feat-icon">❤️</div>
+      <div class="feat-title">Feed communautaire</div>
+      <p class="feat-desc">Likez, commentez, re-spottez. Le feed global ou local vous connecte aux autres passionnés de votre zone.</p>
+    </div>
+    <div class="feat-card">
+      <div class="feat-icon">🏆</div>
+      <div class="feat-title">Défis &amp; badges</div>
+      <p class="feat-desc">15 défis sur l'honneur, des missions quotidiennes rotatives et un système de streak pour garder la flamme.</p>
+    </div>
+    <div class="feat-card">
+      <div class="feat-icon">🐾</div>
+      <div class="feat-title">Streak &amp; niveaux</div>
+      <p class="feat-desc">Chaque action compte : poster, liker, commenter. Votre streak grandit avec votre activité et vos badges s'accumulent.</p>
+    </div>
+    <div class="feat-card">
+      <div class="feat-icon">🌍</div>
+      <div class="feat-title">FR &amp; EN</div>
+      <p class="feat-desc">Interface disponible en français et en anglais. Basculez en un clic depuis le profil.</p>
+    </div>
+  </div>
+</section>
+
+<!-- SOS -->
+<section class="sos-section">
+  <div class="sos-inner">
+    <div class="sos-content">
+      <div class="section-label">Onglet SOS</div>
+      <h2 class="section-title">Un chat perdu ?<br/>La communauté<br/>vous aide.</h2>
+      <p class="section-sub" style="margin-top:16px">Signalez un chat perdu ou trouvé en quelques secondes. La communauté locale reçoit l'alerte et peut vous aider à retrouver l'animal.</p>
+      <div style="margin-top:32px">
+        <a href="/app.html" class="btn-primary" style="display:inline-flex">Voir l'onglet SOS →</a>
+      </div>
+    </div>
+    <div class="sos-cards">
+      <div class="sos-card">
+        <div class="sos-card-badge lost">😿</div>
+        <div class="sos-card-txt">
+          <strong>Chat perdu · Minou · Angers centre</strong>
+          <span>Mâle tigré gris · disparu depuis 2 jours · Récompense offerte</span>
+        </div>
+      </div>
+      <div class="sos-card">
+        <div class="sos-card-badge found">😺</div>
+        <div class="sos-card-txt">
+          <strong>Chat trouvé · Place du Ralliement</strong>
+          <span>Femelle noire et blanche · très docile · tag scanné</span>
+        </div>
+      </div>
+      <div class="sos-card">
+        <div class="sos-card-badge lost">😿</div>
+        <div class="sos-card-txt">
+          <strong>Chat perdu · Paprika · quartier Madeleine</strong>
+          <span>Roux, yeux verts · stérilisé · puce électronique</span>
+        </div>
+      </div>
+      <div style="background:rgba(74,222,128,.08);border:1px solid rgba(74,222,128,.15);border-radius:12px;padding:14px 16px;display:flex;align-items:center;gap:10px">
+        <span style="font-size:16px">🏥</span>
+        <span style="font-size:13px;color:rgba(255,255,255,.5)">Vétérinaires partenaires référencés près de chez vous</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- INSTALL -->
+<section class="install" id="installer">
+  <div class="install-inner">
+    <div class="section-label">Installation</div>
+    <h2 class="section-title" style="color:#fff">Pas de téléchargement,<br/>pas d'app store</h2>
+    <p class="section-sub">Catspot est une PWA. Elle s'installe directement depuis votre navigateur en 3 secondes.</p>
+    <div class="install-steps">
+      <div class="install-step">
+        <div class="install-step-num">1</div>
+        <div class="install-step-title">Ouvrez le lien</div>
+        <p class="install-step-desc">Allez sur www.catspot.app depuis Safari (iOS) ou Chrome (Android)</p>
+      </div>
+      <div class="install-step">
+        <div class="install-step-num">2</div>
+        <div class="install-step-title">Ajoutez à l'écran</div>
+        <p class="install-step-desc">Appuyez sur "Partager" puis "Sur l'écran d'accueil" (iOS) ou la bannière d'installation (Android)</p>
+      </div>
+      <div class="install-step">
+        <div class="install-step-num">3</div>
+        <div class="install-step-title">C'est prêt</div>
+        <p class="install-step-desc">Catspot apparaît comme une vraie app sur votre téléphone. Aucun app store requis.</p>
+      </div>
+    </div>
+    <div class="os-badges">
+      <a href="/app.html" class="os-badge">
+        <span class="os-badge-icon">📱</span>
+        <span>iPhone · Safari</span>
+      </a>
+      <a href="/app.html" class="os-badge">
+        <span class="os-badge-icon">🤖</span>
+        <span>Android · Chrome</span>
+      </a>
+      <a href="/app.html" class="os-badge">
+        <span class="os-badge-icon">💻</span>
+        <span>Desktop · Tous navigateurs</span>
+      </a>
+    </div>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer>
+  <div class="footer-logo">Cat<em>spot</em></div>
+  <div>Fait avec ❤️ à Angers par <a href="mailto:pilipog49@gmail.com">Philippe Auger</a></div>
+  <div>
+    <a href="/app.html">Ouvrir l'app</a>
+    &nbsp;·&nbsp;
+    <a href="mailto:pilipog49@gmail.com">Contact</a>
+  </div>
+</footer>
+
+</body>
+</html>
