@@ -361,7 +361,7 @@ input:focus,textarea:focus{outline:none}
           <button id="feed-filter-global" class="feed-filter-btn active" onclick="setFeedFilter('global')" id="btn-feed-global">🌍 Global</button>
           <button id="feed-filter-nearby" class="feed-filter-btn" onclick="setFeedFilter('nearby')" id="btn-feed-nearby">📍 Près de moi</button>
         </div>
-        <button onclick="refreshFeed()" style="background:var(--warm);border:none;border-radius:20px;padding:6px 12px;font-size:12px;font-weight:700;color:var(--mid);cursor:pointer;font-family:'DM Sans',sans-serif">↻ Refresh</button>
+        <button id="btn-refresh-feed" onclick="refreshFeed()" style="background:var(--warm);border:none;border-radius:20px;padding:6px 12px;font-size:12px;font-weight:700;color:var(--mid);cursor:pointer;font-family:'DM Sans',sans-serif;flex-shrink:0">↻ Refresh</button>
       </div>
       <div class="feed-wrap" id="feed-list"></div>
     </div>
@@ -612,7 +612,7 @@ const T = {
     likes:n=>(n||0)+" like"+(n>1?"s":""), yourPts:"Tes points", thisWeek:"Cette semaine",
     footerCreated:"Une app créée par",
     chSection:"Défis", badgesTitle:"Badges",
-    friendly:"Câlin", wild:"Sauvage", shy:"Timide", playful:"Joueur", proud:"Fier", sleepy:"Endormi", grumpy:"Grognon", curious:"Curieux",
+    friendly:"Câlin", affectionate:"Affectueux", wild:"Sauvage", shy:"Timide", fearful:"Craintif", playful:"Joueur", proud:"Fier", sleepy:"Endormi", grumpy:"Grognon", curious:"Curieux",
     legend:"Légendaire ⭐", proud:"Fier", sleepy:"Endormi", grumpy:"Grognon", curious:"Curieux",
     streakDays:n=>n+" jour"+(n>1?"s":""), streakLbl:"Streak actif",
     proTitle:"Catspot Pro ⭐", proF1:"Stats avancées sur tes spots",
@@ -691,7 +691,7 @@ const T = {
     likes:n=>(n||0)+" like"+(n>1?"s":""), yourPts:"Your points", thisWeek:"This week",
     footerCreated:"An app created by",
     chSection:"Challenges", badgesTitle:"Badges",
-    friendly:"Friendly", wild:"Wild", shy:"Shy", playful:"Playful", proud:"Proud", sleepy:"Sleepy", grumpy:"Grumpy", curious:"Curious",
+    friendly:"Friendly", affectionate:"Affectionate", wild:"Wild", shy:"Shy", fearful:"Fearful", playful:"Playful", proud:"Proud", sleepy:"Sleepy", grumpy:"Grumpy", curious:"Curious",
     legend:"Legendary ⭐", proud:"Proud", sleepy:"Sleepy", grumpy:"Grumpy", curious:"Curious",
     streakDays:n=>n+" day"+(n>1?"s":""), streakLbl:"Active streak",
     proTitle:"Catspot Pro ⭐", proF1:"Advanced stats on your spots",
@@ -798,7 +798,7 @@ let selectedCat = null;
 let mapInstance = null;
 let markers = {};
 let userLat = 47.4784, userLng = -0.5632; // Avrillé par défaut
-let selectedChar = null;
+let selectedChars = [];
 let selectedPhotoFile = null; // Stockage direct du fichier photo — DataTransfer non supporté iOS
 let currentUser = null;  // auth Supabase
 let userProfile = {totalCats:0, streak:0, totalLikes:0};
@@ -1341,8 +1341,8 @@ function openPopup(cat){
   $("popup-desc").textContent=cat.desc||"";
   $("popup-desc").style.display=cat.desc?"block":"none";
   const tagsEl=$("popup-tags"); tagsEl.innerHTML="";
-  const charMap={friendly:t().friendly,wild:t().wild,shy:t().shy,playful:t().playful,proud:t().proud||"Fier",sleepy:t().sleepy||"Endormi",grumpy:t().grumpy||"Grognon",curious:t().curious||"Curieux"};
-  if(cat.char) tagsEl.innerHTML+=`<span class='popup-tag'>${charMap[cat.char]}</span>`;
+  const charMap={friendly:t().friendly,affectionate:t().affectionate||"Affectueux",wild:t().wild,shy:t().shy,fearful:t().fearful||"Craintif",playful:t().playful,proud:t().proud||"Fier",sleepy:t().sleepy||"Endormi",grumpy:t().grumpy||"Grognon",curious:t().curious||"Curieux"};
+  if(cat.char) cat.char.split(",").forEach(c=>{if(charMap[c.trim()])tagsEl.innerHTML+=`<span class='popup-tag'>${charMap[c.trim()]}</span>`;});
   if(cat.legend) tagsEl.innerHTML+=`<span class='popup-tag legend'>⭐ ${t().legend}</span>`;
   updatePopupLike(cat);
 
@@ -1509,16 +1509,10 @@ function setFeedFilter(filter){
 window.setFeedFilter = setFeedFilter;
 
 async function refreshFeed(){
-  const btn = document.querySelector("[onclick=\"refreshFeed()\"]");
+  const btn = document.getElementById("btn-refresh-feed");
   if(btn){ btn.textContent = "↻ ..."; btn.disabled = true; }
   // Recharger depuis Supabase mais en préservant les suppressions locales
-  const deletedIds = new Set();
-  const oldIds = new Set(cats.map(c=>c.id));
   await loadCats();
-  // Retirer les chats qui ont été supprimés localement (pas dans oldIds mais présents en base)
-  // En fait : si un chat était dans oldIds et n'est plus dans cats après loadCats → supprimé en base ✅
-  // Si un chat était dans oldIds et est toujours dans cats → pas supprimé en base
-  // On ne peut pas faire mieux sans tracker les suppressions
   renderFeed();
   renderMapCats();
   updateCatOfDay();
@@ -1965,10 +1959,8 @@ function renderFeed(append=false){
     const ownerBtns=isOwner?`<button onclick="editCat('${cat.id}')" style="background:var(--warm);border:none;border-radius:8px;padding:4px 8px;font-size:11px;font-weight:700;color:var(--mid);cursor:pointer;font-family:'DM Sans',sans-serif">✏️</button>
       <button onclick="deleteCat('${cat.id}')" style="background:#fee2e2;border:none;border-radius:8px;padding:4px 8px;font-size:11px;font-weight:700;color:#dc2626;cursor:pointer;font-family:'DM Sans',sans-serif">🗑️</button>`:"";
     const adminBtn=isAdmin()&&!isOwner?`<button onclick="deleteCat('${cat.id}')" style="margin-left:auto;background:#fee2e2;border:none;border-radius:8px;padding:4px 10px;font-size:11px;font-weight:700;color:#dc2626;cursor:pointer;font-family:'DM Sans',sans-serif">🗑️</button>`:"";
-    const isRare = isCatRare(cat);
     const isToday = cat.created_at && new Date(cat.created_at).toISOString().split("T")[0] === getTodayKey();
-    const badges = (isRare ? `<span class="badge-rare">${t().rareLabel}</span>` : "") +
-                   (isToday ? `<span class="feed-today-badge">${t().todayLabel}</span>` : "");
+    const badges = (isToday ? `<span class="feed-today-badge">${t().todayLabel}</span>` : "");
     return `<div class='feed-card'>
       <div class='feed-head'>
         <div class='feed-avatar' style='background:${color}22;border-color:${color}'>${cat.emoji||"🐱"}</div>
@@ -2382,7 +2374,7 @@ function selectEmoji(e){ selectedEmoji=e; renderEmojiSelect(); }
 window.selectEmoji=selectEmoji;
 
 function openModal(){
-  selectedChar=null;
+  selectedChars=[];
   selectedEmoji="🐱";
   selectedPhotoFile=null; // Reset photo
   $("input-name").value="";
@@ -2407,12 +2399,16 @@ function openModal(){
 }
 
 function renderCharSelect(){
-  $("char-select").innerHTML=["friendly","wild","shy","playful","proud","sleepy","grumpy","curious"].map(c=>
-    "<button class='char-btn"+(selectedChar===c?" selected":"")+"' onclick='selectChar(\""+c+"\")'>"+(t()[c]||c)+"</button>"
+  $("char-select").innerHTML=["friendly","affectionate","wild","shy","fearful","playful","proud","sleepy","grumpy","curious"].map(c=>
+    "<button class='char-btn"+(selectedChars.includes(c)?" selected":"")+"' onclick='selectChar(\""+c+"\")'>"+(t()[c]||c)+"</button>"
   ).join("");
 }
 
-function selectChar(c){selectedChar=c;renderCharSelect();}
+function selectChar(c){
+  if(selectedChars.includes(c)){selectedChars=selectedChars.filter(x=>x!==c);}
+  else{selectedChars=[...selectedChars,c];}
+  renderCharSelect();
+}
 function closeModal(){$("modal-overlay").classList.remove("open");}
 
 function handlePhotoInput(file){
@@ -2468,7 +2464,7 @@ async function _doPublish(){
     color: String(color),
     lat: Number(newLat),
     lng: Number(newLng),
-    char: String(selectedChar || "friendly"),
+    char: selectedChars.length>0 ? selectedChars.join(",") : "friendly",
     sightings: 1,
     likes_count: 0,
     legend: false,
@@ -2505,12 +2501,22 @@ async function _doPublish(){
 
   // Upload photo EN ARRIÈRE-PLAN — ne bloque pas la publication
   if(file && saved.id){
-    uploadPhoto(file, saved.id).then(url=>{
+    uploadPhoto(file, saved.id).then(async url=>{
       if(url){
+        // Mettre à jour l'objet en mémoire (référence dans cats[])
         cat.photo_url = url;
-        sb.from("cats").update({photo_url: url}).eq("id", saved.id).catch(()=>{});
-        // Rafraîchir le feed si visible
+        const idx = cats.findIndex(c=>c.id===saved.id);
+        if(idx>=0) cats[idx].photo_url = url;
+        // Persister dans Supabase avec retry
+        for(let i=0;i<3;i++){
+          const {error} = await sb.from("cats").update({photo_url: url}).eq("id", saved.id);
+          if(!error) break;
+          await new Promise(r=>setTimeout(r,1000));
+        }
+        // Rafraîchir les vues
         if(currentTab==="feed") renderFeed();
+        if(currentTab==="profile") renderProfile();
+        updateCatOfDay();
       }
     }).catch(()=>{});
     completeMission("photo");
