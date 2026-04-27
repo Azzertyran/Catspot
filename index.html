@@ -305,6 +305,11 @@ footer a:hover{color:var(--terra)}
 </style>
 </head>
 <body>
+<script>
+  if(window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone){
+    window.location.replace('/app.html');
+  }
+</script>
 
 <!-- NAV -->
 <nav>
