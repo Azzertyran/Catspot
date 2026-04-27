@@ -375,7 +375,7 @@ input:focus,textarea:focus{outline:none}
       <div class="tab-scroll">
         <!-- Header SOS -->
         <div style="background:linear-gradient(135deg,#DC2626,#EF4444);padding:20px 16px 16px;color:#fff">
-          <div style="font-family:'Fraunces',serif;font-size:22px;font-weight:700" id="sos-title">🆘 SOS Chats</div>
+          <div style="font-family:'Fraunces',serif;font-size:22px;font-weight:700" id="sos-title">SOS Chats</div>
           <div style="font-size:12px;opacity:.8;margin-top:3px" id="sos-sub">Chats perdus, trouvés, et aide d'urgence</div>
         </div>
 
@@ -1972,7 +1972,7 @@ function renderFeed(append=false){
         </div>
         <div style="display:flex;gap:4px;align-items:center;flex-shrink:0">${ownerBtns}${adminBtn}</div>
       </div>
-      <div class='feed-photo' style='background:linear-gradient(135deg,${color}18,${color}42);cursor:pointer' onclick="goToOnMap('${cat.id}')">${photoHtml}<div class='feed-photo-loc'>📍 Catspot</div></div>
+      <div class='feed-photo' style='background:linear-gradient(135deg,${color}18,${color}42);cursor:pointer' onclick="openPhotoLightbox('${cat.id}','${(cat.photo_url||"").replace(/'/g,"\\'")}','${(cat.name||"Chat").replace(/'/g,"\\'")}' )">${photoHtml}<div class='feed-photo-loc'>📍 Catspot</div></div>
       ${cat.desc?`<p class='feed-desc'>"${cat.desc}"</p>`:""}
       <div class='feed-actions'>
         <button class='feed-like-btn' id='fl-${cat.id}' onclick='toggleFeedLike("${cat.id}")' style='color:${isLiked?"#D4572A":"#8A7F72"}'>
@@ -2244,6 +2244,22 @@ function fallbackShare(text){
 }
 window.shareCat = shareCat;
 
+function openPhotoLightbox(catId, photoUrl, catName){
+  document.getElementById("photo-lightbox")?.remove();
+  const lb = document.createElement("div");
+  lb.id = "photo-lightbox";
+  lb.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,.92);z-index:500;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px;gap:16px";
+  lb.innerHTML = `
+    <button onclick="document.getElementById('photo-lightbox').remove()" style="position:absolute;top:16px;right:16px;background:rgba(255,255,255,.15);border:none;border-radius:50%;width:40px;height:40px;font-size:20px;color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center">✕</button>
+    <div style="font-family:'Fraunces',serif;font-size:18px;font-weight:700;color:#fff">${catName}</div>
+    ${photoUrl ? `<img src="${photoUrl}" style="max-width:100%;max-height:65vh;object-fit:contain;border-radius:12px"/>` : `<div style="font-size:60px">🐱</div>`}
+    <button onclick="document.getElementById('photo-lightbox').remove();goToOnMap('${catId}')" style="background:var(--terra);color:#fff;border:none;border-radius:40px;padding:12px 28px;font-size:15px;font-weight:700;cursor:pointer;font-family:'DM Sans',sans-serif">🗺️ Voir sur la carte</button>
+  `;
+  lb.addEventListener("click", e=>{ if(e.target===lb) lb.remove(); });
+  document.body.appendChild(lb);
+}
+window.openPhotoLightbox = openPhotoLightbox;
+
 function goToOnMap(catId){
   const cat = cats.find(c=>c.id===catId);
   if(!cat) return;
@@ -2352,12 +2368,15 @@ async function savePseudo(){
   if(!newName || newName.length<2){ showToast("❌ Pseudo trop court"); return; }
   if(containsBadWord(newName)){ showToast("🚫 Pseudo inapproprié"); return; }
   try {
-    await sb.auth.updateUser({ data:{ full_name: newName } });
+    // Refresh session avant update pour éviter token expiré
+    await sb.auth.refreshSession().catch(()=>{});
+    const {error} = await sb.auth.updateUser({ data:{ full_name: newName } });
+    if(error) throw error;
     currentUser.user_metadata = {...(currentUser.user_metadata||{}), full_name: newName};
     $("profile-name").textContent = newName;
     document.getElementById("pseudo-modal")?.remove();
     showToast("✅ Pseudo mis à jour !");
-  } catch(e){ showToast("❌ Erreur"); }
+  } catch(e){ showToast("❌ Erreur : " + (e.message||"réessaie")); }
 }
 window.savePseudo = savePseudo;
 
