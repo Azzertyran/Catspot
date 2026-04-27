@@ -14,7 +14,9 @@
 <link rel="apple-touch-icon" href="/apple-touch-icon.png"/>
 <title>Catspot 🐾</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"/>
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,400;0,700;0,900;1,400&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,700&display=swap" rel="stylesheet"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,400;0,700;0,900;1,400&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,700&display=swap" rel="stylesheet" media="print" onload="this.media='all'"/>
+<noscript><link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,400;0,700;0,900;1,400&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,700&display=swap" rel="stylesheet"/></noscript>
 <script src="https://unpkg.com/maplibre-gl@4.1.3/dist/maplibre-gl.js"></script>
 <link href="https://unpkg.com/maplibre-gl@4.1.3/dist/maplibre-gl.css" rel="stylesheet"/>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -913,13 +915,11 @@ async function signInWithGoogle(){
 }
 
 async function signOut(){
-  try {
-    await sb.auth.signOut();
-  } catch(e){
-    // Retry une fois
-    try { await sb.auth.signOut(); } catch(e2){}
-  }
-  // Recharger proprement dans tous les cas
+  try { await sb.auth.signOut(); } catch(e){}
+  // Nettoyer tous les tokens Supabase du localStorage même si signOut échoue
+  Object.keys(localStorage).forEach(k=>{
+    if(k.startsWith("sb-") || k.includes("supabase")) localStorage.removeItem(k);
+  });
   window.location.href = window.location.pathname;
 }
 
