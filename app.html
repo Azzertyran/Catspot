@@ -1102,9 +1102,8 @@ async function uploadPhoto(file, catId){
   if(!file) return null;
   try {
     const compressed = await compressImage(file);
-    const blob = new Blob([compressed], {type: "image/jpeg"});
     const path = catId + "/" + Date.now() + ".jpg";
-    const {error} = await sb.storage.from("cat-photos").upload(path, blob, {contentType: "image/jpeg"});
+    const {error} = await sb.storage.from("cat-photos").upload(path, compressed, {contentType: "image/jpeg", upsert: true});
     if(error){ console.error("Upload error:", error); return null; }
     const {data} = sb.storage.from("cat-photos").getPublicUrl(path);
     return data?.publicUrl || null;
@@ -2455,16 +2454,7 @@ async function _doPublish(){
     || currentUser?.email?.split("@")[0]
     || (lang==="fr"?"Anonyme":"Anonymous");
 
-  // Upload photo EN PREMIER — avant de créer le chat
-  // Comme ça la photo_url est incluse dès la création, pas besoin d'update
-  let photo_url = null;
-  if(file){
-    showToast("📸 " + (lang==="fr" ? "Upload de la photo..." : "Uploading photo..."));
-    const tempId = "tmp_" + Date.now();
-    photo_url = await uploadPhoto(file, tempId);
-    completeMission("photo");
-  }
-
+  // Créer le chat d'abord sans photo
   const saved = await saveCat({
     name: String(name),
     color: String(color),
@@ -2475,19 +2465,16 @@ async function _doPublish(){
     likes_count: 0,
     legend: false,
     description: String(desc || ""),
-    posted_by: String(posted_by),
-    photo_url: photo_url || null
+    posted_by: String(posted_by)
   });
 
-  // Si la sauvegarde Supabase échoue → on arrête, l'erreur est déjà affichée
   if(!saved){
     console.error("Publication échouée — saveCat null");
     return;
   }
 
-  const cat = {...saved, likes:0, desc:saved.description||"", photo_url: photo_url || saved.photo_url || null};
+  const cat = {...saved, likes:0, desc:saved.description||""};
 
-  // Succès immédiat — afficher le chat
   cats.unshift(cat);
   selectedPhotoFile = null;
   userProfile.totalCats = (userProfile.totalCats||0) + 1;
@@ -2505,6 +2492,23 @@ async function _doPublish(){
   }
   if(currentTab==="feed") renderFeed();
   if(currentTab==="profile") renderProfile();
+
+  // Upload photo en arrière-plan via sb.storage (comme BenchMark)
+  if(file && saved.id){
+    completeMission("photo");
+    uploadPhoto(file, saved.id).then(async url=>{
+      if(url){
+        cat.photo_url = url;
+        const idx = cats.findIndex(c=>c.id===saved.id);
+        if(idx>=0) cats[idx].photo_url = url;
+        // Update via sb avec la service key — RLS contournées
+        await sb.from("cats").update({photo_url: url}).eq("id", saved.id);
+        if(currentTab==="feed") renderFeed();
+        if(currentTab==="profile") renderProfile();
+        updateCatOfDay();
+      }
+    }).catch(e=>console.error("Photo upload failed:", e));
+  }
 } // fin _doPublish
 function updateNavVisibility(){
   // Onglet Défis visible uniquement si connecté
