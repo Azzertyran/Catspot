@@ -2501,8 +2501,12 @@ async function _doPublish(){
         cat.photo_url = url;
         const idx = cats.findIndex(c=>c.id===saved.id);
         if(idx>=0) cats[idx].photo_url = url;
-        // Update via sb avec la service key — RLS contournées
-        await sb.from("cats").update({photo_url: url}).eq("id", saved.id);
+        // Update via API serverless avec service key — contourne les RLS
+        await fetch("/api/update-photo", {
+          method: "POST",
+          headers: {"Content-Type": "application/json"},
+          body: JSON.stringify({cat_id: saved.id, photo_url: url})
+        });
         if(currentTab==="feed") renderFeed();
         if(currentTab==="profile") renderProfile();
         updateCatOfDay();
