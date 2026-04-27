@@ -1103,11 +1103,18 @@ async function uploadPhoto(file, catId){
   try {
     const compressed = await compressImage(file);
     const path = catId + "/" + Date.now() + ".jpg";
-    const {error} = await sb.storage.from("cat-photos").upload(path, compressed, {contentType: "image/jpeg", upsert: true});
-    if(error){ console.error("Upload error:", error); return null; }
-    const {data} = sb.storage.from("cat-photos").getPublicUrl(path);
+    const response = await fetch("/api/upload", {
+      method: "POST",
+      headers: {
+        "x-file-path": path,
+        "x-content-type": "image/jpeg"
+      },
+      body: compressed
+    });
+    if(!response.ok){ return null; }
+    const data = await response.json();
     return data?.publicUrl || null;
-  } catch(e){ console.error("Upload exception:", e); return null; }
+  } catch(e){ return null; }
 }
 
 function compressImage(file, maxPx=800, quality=0.75){
