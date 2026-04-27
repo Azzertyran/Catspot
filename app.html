@@ -48,14 +48,14 @@ input:focus,textarea:focus{outline:none}
 .tab-panel{position:absolute;inset:0;overflow-y:auto;overflow-x:hidden;display:none;padding-bottom:calc(var(--nav) + var(--safe-bottom) + 80px);contain:strict}
 .tab-panel.active{display:block}
 #tab-map{padding:0;display:none;contain:strict}
-#tab-map.active{display:flex;flex-direction:column;position:absolute;inset:0}
+#tab-map.active{display:flex;flex-direction:column;position:absolute;top:0;left:0;right:0;bottom:calc(var(--nav) + env(safe-area-inset-bottom, 0px))}
 
 /* MAP */
-#maplibre{position:absolute;top:0;left:0;right:0;bottom:calc(var(--nav) + env(safe-area-inset-bottom, 0px));z-index:1}
+#maplibre{position:absolute;top:0;left:0;right:0;bottom:0;z-index:1}
 .maplibregl-map{width:100%!important;height:100%!important}
 .maplibregl-ctrl-group{border-radius:10px!important;box-shadow:0 2px 8px rgba(0,0,0,0.15)!important;border:none!important}
 .maplibregl-ctrl-zoom-in,.maplibregl-ctrl-zoom-out{border:none!important}
-#map{position:absolute;top:0;left:0;right:0;bottom:calc(var(--nav) + env(safe-area-inset-bottom, 0px));z-index:2;pointer-events:none}
+#map{position:absolute;top:0;left:0;right:0;bottom:0;z-index:2;pointer-events:none}
 .maplibregl-marker{will-change:auto!important;transform-origin:top left}
 .cat-pin.selected{outline:3px solid #fff;outline-offset:2px;box-shadow:0 0 0 5px var(--pin-color,#D4572A),0 6px 20px rgba(0,0,0,0.3)!important}
 .cat-pin.legend::after{content:"⭐";position:absolute;top:-5px;right:-5px;font-size:10px;pointer-events:none;line-height:1}
@@ -133,7 +133,7 @@ input:focus,textarea:focus{outline:none}
 .popup-expand-hint{text-align:center;font-size:11px;color:var(--muted);margin-top:10px;display:flex;align-items:center;justify-content:center;gap:4px}
 
 /* FAB */
-#fab{position:fixed;bottom:calc(var(--nav) + env(safe-area-inset-bottom, 0px) + 16px);left:50%;transform:translateX(-50%);width:56px;height:56px;border-radius:50%;background:linear-gradient(145deg,var(--terra),var(--amber));border:3px solid var(--light);box-shadow:0 4px 20px rgba(212,87,42,.55);z-index:40;display:flex;align-items:center;justify-content:center;font-size:24px;transition:transform .15s,box-shadow .15s}
+#fab{position:fixed;bottom:calc(var(--nav) + env(safe-area-inset-bottom, 0px) + 12px);left:50%;transform:translateX(-50%);width:56px;height:56px;border-radius:50%;background:linear-gradient(145deg,var(--terra),var(--amber));border:3px solid var(--light);box-shadow:0 4px 20px rgba(212,87,42,.55);z-index:40;display:flex;align-items:center;justify-content:center;font-size:24px;transition:transform .15s,box-shadow .15s}
 #fab:active{transform:translateX(-50%) scale(0.93)}
 #cat-popup.open ~ #fab, body.popup-open #fab{display:none!important}
 
