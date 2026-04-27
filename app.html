@@ -1102,19 +1102,13 @@ async function uploadPhoto(file, catId){
   if(!file) return null;
   try {
     const compressed = await compressImage(file);
-    const path = catId+"/"+Date.now()+".jpg";
-    const response = await fetch("/api/upload", {
-      method: "POST",
-      headers: {
-        "x-file-path": path,
-        "x-content-type": "image/jpeg"
-      },
-      body: compressed
-    });
-    if(!response.ok){ return null; }
-    const data = await response.json();
+    const blob = new Blob([compressed], {type: "image/jpeg"});
+    const path = catId + "/" + Date.now() + ".jpg";
+    const {error} = await sb.storage.from("cat-photos").upload(path, blob, {contentType: "image/jpeg"});
+    if(error){ console.error("Upload error:", error); return null; }
+    const {data} = sb.storage.from("cat-photos").getPublicUrl(path);
     return data?.publicUrl || null;
-  } catch(e){ return null; }
+  } catch(e){ console.error("Upload exception:", e); return null; }
 }
 
 function compressImage(file, maxPx=800, quality=0.75){
@@ -2461,6 +2455,16 @@ async function _doPublish(){
     || currentUser?.email?.split("@")[0]
     || (lang==="fr"?"Anonyme":"Anonymous");
 
+  // Upload photo EN PREMIER — avant de créer le chat
+  // Comme ça la photo_url est incluse dès la création, pas besoin d'update
+  let photo_url = null;
+  if(file){
+    showToast("📸 " + (lang==="fr" ? "Upload de la photo..." : "Uploading photo..."));
+    const tempId = "tmp_" + Date.now();
+    photo_url = await uploadPhoto(file, tempId);
+    completeMission("photo");
+  }
+
   const saved = await saveCat({
     name: String(name),
     color: String(color),
@@ -2471,7 +2475,8 @@ async function _doPublish(){
     likes_count: 0,
     legend: false,
     description: String(desc || ""),
-    posted_by: String(posted_by)
+    posted_by: String(posted_by),
+    photo_url: photo_url || null
   });
 
   // Si la sauvegarde Supabase échoue → on arrête, l'erreur est déjà affichée
@@ -2480,9 +2485,9 @@ async function _doPublish(){
     return;
   }
 
-  const cat = {...saved, likes:0, desc:saved.description||""};
+  const cat = {...saved, likes:0, desc:saved.description||"", photo_url: photo_url || saved.photo_url || null};
 
-  // Succès immédiat — afficher le chat sans attendre la photo
+  // Succès immédiat — afficher le chat
   cats.unshift(cat);
   selectedPhotoFile = null;
   userProfile.totalCats = (userProfile.totalCats||0) + 1;
@@ -2500,29 +2505,6 @@ async function _doPublish(){
   }
   if(currentTab==="feed") renderFeed();
   if(currentTab==="profile") renderProfile();
-
-  // Upload photo EN ARRIÈRE-PLAN — ne bloque pas la publication
-  if(file && saved.id){
-    uploadPhoto(file, saved.id).then(async url=>{
-      if(url){
-        // Mettre à jour l'objet en mémoire (référence dans cats[])
-        cat.photo_url = url;
-        const idx = cats.findIndex(c=>c.id===saved.id);
-        if(idx>=0) cats[idx].photo_url = url;
-        // Persister dans Supabase avec retry
-        for(let i=0;i<3;i++){
-          const {error} = await sb.from("cats").update({photo_url: url}).eq("id", saved.id);
-          if(!error) break;
-          await new Promise(r=>setTimeout(r,1000));
-        }
-        // Rafraîchir les vues
-        if(currentTab==="feed") renderFeed();
-        if(currentTab==="profile") renderProfile();
-        updateCatOfDay();
-      }
-    }).catch(()=>{});
-    completeMission("photo");
-  }
 } // fin _doPublish
 function updateNavVisibility(){
   // Onglet Défis visible uniquement si connecté
