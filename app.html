@@ -53,7 +53,18 @@ input:focus,textarea:focus{outline:none}
 #tab-map.active{display:flex;flex-direction:column;position:absolute;top:0;left:0;right:0;bottom:calc(var(--nav) + env(safe-area-inset-bottom, 0px))}
 
 /* MAP */
-#maplibre{position:absolute;top:0;left:0;right:0;bottom:0;z-index:1}
+#notif-panel{position:fixed;top:var(--header);right:0;width:min(340px,95vw);max-height:70vh;background:var(--light);border-left:1px solid var(--warm);border-bottom:1px solid var(--warm);border-radius:0 0 0 16px;box-shadow:-4px 4px 24px rgba(0,0,0,.12);z-index:50;display:none;flex-direction:column;overflow:hidden}
+#notif-panel.open{display:flex}
+.notif-header{padding:14px 16px 10px;font-weight:700;font-size:14px;border-bottom:1px solid var(--warm);display:flex;justify-content:space-between;align-items:center}
+.notif-list{overflow-y:auto;flex:1}
+.notif-item{padding:12px 16px;border-bottom:1px solid rgba(0,0,0,.05);display:flex;gap:10px;align-items:flex-start;cursor:pointer;transition:background .15s}
+.notif-item:hover{background:var(--warm)}
+.notif-item.unread{background:rgba(212,87,42,.05)}
+.notif-icon{width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,var(--terra),var(--amber));display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0}
+.notif-text{flex:1;font-size:13px;line-height:1.4}
+.notif-text strong{color:var(--terra)}
+.notif-time{font-size:10px;color:var(--muted);margin-top:3px}
+.notif-empty{padding:32px 16px;text-align:center;color:var(--muted);font-size:14px}
 .maplibregl-map{width:100%!important;height:100%!important}
 .maplibregl-ctrl-group{border-radius:10px!important;box-shadow:0 2px 8px rgba(0,0,0,0.15)!important;border:none!important}
 .maplibregl-ctrl-zoom-in,.maplibregl-ctrl-zoom-out{border:none!important}
@@ -287,6 +298,13 @@ input:focus,textarea:focus{outline:none}
 </div>
 
 <div id="app">
+  <div id="notif-panel">
+    <div class="notif-header">
+      <span id="notif-title">🔔 Notifications</span>
+      <button onclick="markAllNotifsRead()" style="font-size:11px;color:var(--terra);background:none;border:none;cursor:pointer;font-weight:600">Tout lire</button>
+    </div>
+    <div class="notif-list" id="notif-list"></div>
+  </div>
   <header id="header">
     <div style="text-decoration:none;color:inherit">
       <div class="logo-wrap">
@@ -294,7 +312,12 @@ input:focus,textarea:focus{outline:none}
         <span class="app-name serif">Cat<span>spot</span></span>
       </div>
     </div>
-    <button id="lang-btn">EN 🌍</button>
+    <div style="display:flex;align-items:center;gap:8px">
+      <button id="notif-btn" onclick="toggleNotifPanel()" style="position:relative;background:var(--warm);border:1px solid rgba(0,0,0,0.08);border-radius:20px;padding:5px 10px;font-size:16px;cursor:pointer;display:none">
+        🔔<span id="notif-badge" style="display:none;position:absolute;top:-4px;right:-4px;background:#EF4444;color:#fff;font-size:9px;font-weight:800;border-radius:50%;width:16px;height:16px;line-height:16px;text-align:center">0</span>
+      </button>
+      <button id="lang-btn">EN 🌍</button>
+    </div>
   </header>
 
   <div id="tabs">
@@ -866,6 +889,7 @@ async function initAuth(){
     currentUser = session?.user || null;
 
     if(event === "SIGNED_IN" && currentUser && !currentUser.is_anonymous){
+      renderNotifBadge();
       likes = {};
       await Promise.all([loadUserLikes(), loadUserProfile()]);
       await loadChallengesForUser();
@@ -952,7 +976,116 @@ function updateAuthUI(){
   updateNavVisibility();
 }
 
-// ── SUPABASE : CATS ───────────────────────────────────────────
+// ── NOTIFICATIONS ─────────────────────────────────────────────
+let notifications = JSON.parse(localStorage.getItem("catspot_notifs") || "[]");
+let notifPanelOpen = false;
+
+function saveNotifs(){
+  try { localStorage.setItem("catspot_notifs", JSON.stringify(notifications.slice(0,50))); } catch(e){}
+}
+
+function addNotif(type, catName, author){
+  if(!currentUser || currentUser.is_anonymous) return;
+  const notif = {
+    id: Date.now()+"_"+Math.random().toString(36).slice(2),
+    type,
+    catName,
+    author,
+    time: Date.now(),
+    read: false
+  };
+  notifications.unshift(notif);
+  saveNotifs();
+  renderNotifBadge();
+}
+
+function renderNotifBadge(){
+  const btn = document.getElementById("notif-btn");
+  const badge = document.getElementById("notif-badge");
+  if(!btn || !currentUser || currentUser.is_anonymous){ if(btn) btn.style.display="none"; return; }
+  btn.style.display = "flex";
+  const unread = notifications.filter(n=>!n.read).length;
+  if(unread > 0){
+    badge.style.display = "block";
+    badge.textContent = unread > 9 ? "9+" : unread;
+  } else {
+    badge.style.display = "none";
+  }
+}
+
+function renderNotifList(){
+  const list = document.getElementById("notif-list");
+  if(!list) return;
+  if(!notifications.length){
+    list.innerHTML = `<div class="notif-empty">🐾 Pas encore de notifications</div>`;
+    return;
+  }
+  list.innerHTML = notifications.map(n=>{
+    const icon = n.type === "like" ? "❤️" : "💬";
+    const txt = n.type === "like"
+      ? `<strong>${n.author}</strong> a aimé ton chat <strong>${n.catName}</strong>`
+      : `<strong>${n.author}</strong> a commenté ton chat <strong>${n.catName}</strong>`;
+    const ago = timeAgo(n.time);
+    return `<div class="notif-item ${n.read?"":"unread"}" onclick="markNotifRead('${n.id}')">
+      <div class="notif-icon">${icon}</div>
+      <div class="notif-text">${txt}<div class="notif-time">${ago}</div></div>
+    </div>`;
+  }).join("");
+}
+
+function toggleNotifPanel(){
+  notifPanelOpen = !notifPanelOpen;
+  const panel = document.getElementById("notif-panel");
+  if(notifPanelOpen){
+    panel.classList.add("open");
+    renderNotifList();
+  } else {
+    panel.classList.remove("open");
+  }
+}
+
+function markNotifRead(id){
+  const n = notifications.find(n=>n.id===id);
+  if(n) n.read = true;
+  saveNotifs();
+  renderNotifBadge();
+  renderNotifList();
+}
+
+function markAllNotifsRead(){
+  notifications.forEach(n=>n.read=true);
+  saveNotifs();
+  renderNotifBadge();
+  renderNotifList();
+}
+
+// Fermer le panel si on clique ailleurs
+document.addEventListener("click", e=>{
+  const panel = document.getElementById("notif-panel");
+  const btn = document.getElementById("notif-btn");
+  if(notifPanelOpen && panel && !panel.contains(e.target) && !btn?.contains(e.target)){
+    notifPanelOpen = false;
+    panel.classList.remove("open");
+  }
+});
+
+function timeAgo(ts){
+  const diff = Date.now() - ts;
+  const min = Math.floor(diff/60000);
+  if(min < 1) return lang==="fr" ? "À l'instant" : "Just now";
+  if(min < 60) return lang==="fr" ? `Il y a ${min} min` : `${min} min ago`;
+  const h = Math.floor(min/60);
+  if(h < 24) return lang==="fr" ? `Il y a ${h}h` : `${h}h ago`;
+  const d = Math.floor(h/24);
+  return lang==="fr" ? `Il y a ${d}j` : `${d}d ago`;
+}
+
+window.toggleNotifPanel = toggleNotifPanel;
+window.markNotifRead = markNotifRead;
+window.markAllNotifsRead = markAllNotifsRead;
+
+// ── FIN NOTIFICATIONS ──────────────────────────────────────────
+
 async function loadCats(){
   try {
     const {data,error} = await sb.from("cats").select("*").order("created_at",{ascending:false});
@@ -1095,6 +1228,16 @@ async function toggleLikeDB(catId, wasLiked){
       headers:{"Content-Type":"application/json"},
       body:JSON.stringify({cat_id:catId, user_id:currentUser.id, was_liked:wasLiked})
     });
+    // Notif si c'est pas son propre chat et que c'est un like (pas unlike)
+    if(!wasLiked){
+      const cat = cats.find(c=>c.id===catId);
+      if(cat && cat.posted_by){
+        const myName = currentUser?.user_metadata?.full_name || currentUser?.email?.split("@")[0] || "";
+        if(cat.posted_by !== myName){
+          addNotif("like", cat.name || "Chat", myName);
+        }
+      }
+    }
   } catch(e){}
 }
 
@@ -1648,6 +1791,11 @@ async function postComment(catId){
     commentCounts[catId] = (commentCounts[catId]||0)+1;
     completeMission("comment");
     trackActivity("comment");
+    // Notif si c'est pas son propre chat
+    const cat = cats.find(c=>c.id===catId);
+    if(cat && cat.posted_by && cat.posted_by !== author){
+      addNotif("comment", cat.name || "Chat", author);
+    }
     const feedBtn = document.querySelector(`button[onclick="showComments('${catId}')"]`);
     if(feedBtn){
       const n = commentCounts[catId];
