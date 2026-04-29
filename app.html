@@ -388,7 +388,7 @@ input:focus,textarea:focus{outline:none}
           <button id="feed-filter-global" class="feed-filter-btn active" onclick="setFeedFilter('global')" id="btn-feed-global">🌍 Global</button>
           <button id="feed-filter-nearby" class="feed-filter-btn" onclick="setFeedFilter('nearby')" id="btn-feed-nearby">📍 Près de moi</button>
         </div>
-        <button id="btn-refresh-feed" onclick="refreshFeed()" style="background:var(--warm);border:none;border-radius:20px;padding:6px 12px;font-size:12px;font-weight:700;color:var(--mid);cursor:pointer;font-family:'DM Sans',sans-serif;flex-shrink:0">↻ Refresh</button>
+        <button id="btn-refresh-feed" onclick="refreshFeed()" style="background:var(--warm);border:none;border-radius:20px;padding:6px 12px;font-size:12px;font-weight:700;color:var(--mid);cursor:pointer;font-family:'DM Sans',sans-serif;flex-shrink:0">↻ Actualiser</button>
       </div>
       <div class="feed-wrap" id="feed-list"></div>
     </div>
@@ -671,7 +671,7 @@ const T = {
     m6title:"Social", m6desc:"Laisse un commentaire",
     rareLabel:"✨ Rare", todayLabel:"⚡ Auj.",
     pinLegendTitle:"Vu il y a", pinLegend1:"Moins d'1h", pinLegend2:"Aujourd'hui", pinLegend3:"Plus ancien",
-    feedGlobal:"🌍 Global", feedNearby:"📍 Près de moi", feedRefresh:"↻ Refresh",
+    feedGlobal:"🌍 Global", feedNearby:"📍 Près de moi", feedRefresh:"↻ Actualiser",
     sosTitle:"SOS Chats", sosSub:"Chats perdus, trouvés, et aide d'urgence",
     sosAll:"Tous", sosLost:"🔴 Perdus", sosFound:"🟢 Trouvés",
     sosBtn:"🐱 Signaler un chat perdu ou trouvé",
@@ -870,17 +870,23 @@ async function initAuth(){
       currentUser = null;
     } else if(data?.session?.user){
       currentUser = data.session.user;
-      await Promise.all([loadUserLikes(), loadUserProfile()]);
+      await Promise.all([loadUserLikes(), loadUserProfile(), loadCats()]);
       await loadChallengesForUser();
-      trackActivity("open"); // Maintenir le streak à chaque ouverture
+      trackActivity("open");
     } else {
       currentUser = null;
+      await loadCats(); // Charger même sans être connecté
     }
   } catch(e){
     console.error("initAuth:", e.message);
     clearSupabaseStorage();
     currentUser = null;
+    await loadCats(); // Charger quand même
   }
+
+  // Render immédiat dès que les chats sont là
+  renderFeed();
+  if(mapInstance && mapInstance.isStyleLoaded()){ renderMapCats(); updateCatOfDay(); }
 
   updateAuthUI();
 
@@ -893,7 +899,7 @@ async function initAuth(){
       likes = {};
       await Promise.all([loadUserLikes(), loadUserProfile()]);
       await loadChallengesForUser();
-      await loadCats();
+      if(!cats.length) await loadCats(); // Charger seulement si pas encore fait
       trackActivity("open");
       if(mapInstance && mapInstance.isStyleLoaded()){ renderMapCats(); updateCatOfDay(); }
       updateAuthUI();
@@ -1656,12 +1662,11 @@ window.setFeedFilter = setFeedFilter;
 async function refreshFeed(){
   const btn = document.getElementById("btn-refresh-feed");
   if(btn){ btn.textContent = "↻ ..."; btn.disabled = true; }
-  // Recharger depuis Supabase mais en préservant les suppressions locales
   await loadCats();
   renderFeed();
   renderMapCats();
   updateCatOfDay();
-  if(btn){ btn.textContent = "↻ Refresh"; btn.disabled = false; }
+  if(btn){ btn.textContent = lang==="fr" ? "↻ Actualiser" : "↻ Refresh"; btn.disabled = false; }
   showToast("🔄 "+(lang==="fr"?"Feed mis à jour":"Feed refreshed"));
 }
 window.refreshFeed = refreshFeed;
